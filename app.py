@@ -23,7 +23,7 @@ def send_fast2sms(phone, otp):
     }
 
     headers = {
-        "authorization": "VBR6DPrMRi9rWko5KaPhIBQeJCKdUEP9ytgR7vzrCdsNeOJlmuWp7XLLm9T7",  # 🔴 replace this
+        "authorization": "wZAs7xQMZ2HqOnq6WEfeIwsKn2JO2qW5SV5nZfznLymknWR74z8rXoB0lT5U",  # 🔴 replace this
         "Content-Type": "application/json"
     }
 
