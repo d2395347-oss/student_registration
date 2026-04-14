@@ -29,7 +29,8 @@ def send_fast2sms(phone, otp):
 
     response = requests.post(url, json=payload, headers=headers)
 
-    print("Fast2SMS Response:", response.text)
+    print("STATUS CODE:", response.status_code)
+    print("FAST2SMS RESPONSE:", response.text)
 
 
 # ---------------- OTP GENERATION ----------------
