@@ -22,6 +22,22 @@ OTP_EXPIRY = 300
 RESEND_INTERVAL = 30
 
 # ----------- FUNCTIONS -----------
+def send_fast2sms(phone, otp):
+    url = "https://www.fast2sms.com/dev/bulkV2"
+
+    payload = {
+        "route": "otp",
+        "variables_values": otp,
+        "numbers": phone
+    }
+
+    headers = {
+        "wczKj6W8ohImGBVxiH0q91rCtUnYNgyApMsFvJOR2b4dZTQSkfuTgilfAGWVyt8EN19SvD3bMcrF02Yj",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(url, json=payload, headers=headers)
+    print(response.text)
 
 def generate_otp(phone):
     otp = str(random.randint(100000, 999999))
@@ -29,7 +45,7 @@ def generate_otp(phone):
         "otp": otp,
         "time": time.time()
     }
-    print(f"OTP for {phone}: {otp}")  # shown in terminal
+    send_fast2sms(phone, otp) # shown in terminal
     return otp
 
 
