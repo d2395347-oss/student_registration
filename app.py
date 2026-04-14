@@ -2,18 +2,19 @@ from flask import Flask, render_template, request, jsonify
 import mysql.connector
 import random
 import time
+import os
 
 app = Flask(__name__)
 
 # ----------- DATABASE -----------
-db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="Narayan@1234",  # change this
-    database="student_db"
-)
+# db = mysql.connector.connect(
+#     host="localhost",
+#     user="root",
+#     password="Narayan@1234",  # change this
+#     database="student_db"
+# )
 
-cursor = db.cursor()
+# cursor = db.cursor()
 
 # ----------- OTP STORAGE -----------
 otp_store = {}
@@ -100,6 +101,7 @@ def submit():
     email = request.form['email']
     phone = request.form['phone']
     aadhaar = request.form['aadhaar']
+    return "Form received (DB disabled for testing)"
 
     if not validate_aadhaar(aadhaar):
         return "Invalid Aadhaar"
@@ -116,4 +118,5 @@ def submit():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
