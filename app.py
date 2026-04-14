@@ -12,8 +12,10 @@ OTP_EXPIRY = 300
 RESEND_INTERVAL = 30
 
 
-# ---------------- FAST2SMS FUNCTION ----------------
+# ---------------- FAST2SMS ----------------
 def send_fast2sms(phone, otp):
+    print("🔥 INSIDE FAST2SMS FUNCTION")
+
     url = "https://www.fast2sms.com/dev/bulkV2"
 
     payload = {
@@ -23,14 +25,18 @@ def send_fast2sms(phone, otp):
     }
 
     headers = {
-        "authorization": "wZAs7xQMZ2HqOnq6WEfeIwsKn2JO2qW5SV5nZfznLymknWR74z8rXoB0lT5U",  # 🔴 replace this
+        "authorization": "YOUR_FAST2SMS_API_KEY",  # 🔴 replace this
         "Content-Type": "application/json"
     }
 
-    response = requests.post(url, json=payload, headers=headers)
+    try:
+        response = requests.post(url, json=payload, headers=headers)
 
-    print("STATUS CODE:", response.status_code)
-    print("FAST2SMS RESPONSE:", response.text)
+        print("🔥 FAST2SMS STATUS CODE:", response.status_code)
+        print("🔥 FAST2SMS RESPONSE:", response.text)
+
+    except Exception as e:
+        print("❌ FAST2SMS ERROR:", str(e))
 
 
 # ---------------- OTP GENERATION ----------------
@@ -42,12 +48,14 @@ def generate_otp(phone):
         "time": time.time()
     }
 
+    print("🔥 GENERATED OTP FOR DEBUG:", otp)
+
     send_fast2sms(phone, otp)
     return otp
 
 
 # ---------------- OTP VERIFY ----------------
-def verify_otp(phone, user_otp):
+def verify_otp_func(phone, user_otp):
     if phone not in otp_store:
         return False, "No OTP sent"
 
@@ -67,13 +75,21 @@ def can_resend(phone):
     if phone not in otp_store:
         return True
 
-    if time.time() - otp_store[phone]["time"] < RESEND_INTERVAL:
-        return False
-
-    return True
+    return (time.time() - otp_store[phone]["time"]) >= RESEND_INTERVAL
 
 
 # ---------------- UTILITIES ----------------
+def clean_phone(phone):
+    phone = phone.strip()
+
+    if phone.startswith("+91"):
+        phone = phone[3:]
+
+    phone = phone.replace(" ", "")
+
+    return phone
+
+
 def mask_aadhaar(aadhaar):
     return "XXXXXXXX" + aadhaar[-4:]
 
@@ -91,29 +107,29 @@ def home():
 
 @app.route('/send_otp', methods=['POST'])
 def send_otp():
-    phone = request.form['phone'].strip()
+    print("🔥 SEND OTP HIT")
 
-    # clean phone number
-    if phone.startswith("+91"):
-        phone = phone.replace("+91", "")
+    phone = request.form['phone']
+    phone = clean_phone(phone)
 
-    if phone.startswith("91") and len(phone) == 12:
-        phone = phone[2:]
+    print("📱 CLEAN PHONE:", phone)
 
     if not can_resend(phone):
         return jsonify({"status": "error", "message": "Wait before resending OTP"})
 
     generate_otp(phone)
 
+    print("🔥 OTP PROCESS COMPLETED")
+
     return jsonify({"status": "success", "message": "OTP Sent"})
 
 
 @app.route('/verify_otp', methods=['POST'])
 def verify():
-    phone = request.form['phone'].strip()
+    phone = clean_phone(request.form['phone'])
     otp = request.form['otp'].strip()
 
-    valid, message = verify_otp(phone, otp)
+    valid, message = verify_otp_func(phone, otp)
 
     return jsonify({"status": valid, "message": message})
 
@@ -131,6 +147,8 @@ def submit():
         return "Invalid Aadhaar"
 
     masked = mask_aadhaar(aadhaar)
+
+    print("✅ FORM SUBMITTED:", name, phone)
 
     return "Form received successfully"
 
