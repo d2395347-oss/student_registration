@@ -1,54 +1,51 @@
 from flask import Flask, render_template, request, jsonify
-import mysql.connector
 import random
 import time
 import os
+import requests
 
 app = Flask(__name__)
 
-# ----------- DATABASE -----------
-# db = mysql.connector.connect(
-#     host="localhost",
-#     user="root",
-#     password="Narayan@1234",  # change this
-#     database="student_db"
-# )
-
-# cursor = db.cursor()
-
-# ----------- OTP STORAGE -----------
+# ---------------- OTP STORAGE ----------------
 otp_store = {}
 OTP_EXPIRY = 300
 RESEND_INTERVAL = 30
 
-# ----------- FUNCTIONS -----------
+
+# ---------------- FAST2SMS FUNCTION ----------------
 def send_fast2sms(phone, otp):
     url = "https://www.fast2sms.com/dev/bulkV2"
 
     payload = {
-        "route": "otp",
         "variables_values": otp,
+        "route": "otp",
         "numbers": phone
     }
 
     headers = {
-        "wczKj6W8ohImGBVxiH0q91rCtUnYNgyApMsFvJOR2b4dZTQSkfuTgilfAGWVyt8EN19SvD3bMcrF02Yj",
+        "authorization": "VBR6DPrMRi9rWko5KaPhIBQeJCKdUEP9ytgR7vzrCdsNeOJlmuWp7XLLm9T7",  # 🔴 replace this
         "Content-Type": "application/json"
     }
 
     response = requests.post(url, json=payload, headers=headers)
-    print(response.text)
 
+    print("Fast2SMS Response:", response.text)
+
+
+# ---------------- OTP GENERATION ----------------
 def generate_otp(phone):
     otp = str(random.randint(100000, 999999))
+
     otp_store[phone] = {
         "otp": otp,
         "time": time.time()
     }
-    send_fast2sms(phone, otp) # shown in terminal
+
+    send_fast2sms(phone, otp)
     return otp
 
 
+# ---------------- OTP VERIFY ----------------
 def verify_otp(phone, user_otp):
     if phone not in otp_store:
         return False, "No OTP sent"
@@ -64,6 +61,7 @@ def verify_otp(phone, user_otp):
     return False, "Invalid OTP"
 
 
+# ---------------- RESEND CHECK ----------------
 def can_resend(phone):
     if phone not in otp_store:
         return True
@@ -74,14 +72,16 @@ def can_resend(phone):
     return True
 
 
+# ---------------- UTILITIES ----------------
 def mask_aadhaar(aadhaar):
     return "XXXXXXXX" + aadhaar[-4:]
 
 
 def validate_aadhaar(aadhaar):
-    return len(aadhaar) == 12 and aadhaar.isdigit() and aadhaar[0] not in ['0','1']
+    return len(aadhaar) == 12 and aadhaar.isdigit() and aadhaar[0] not in ['0', '1']
 
-# ----------- ROUTES -----------
+
+# ---------------- ROUTES ----------------
 
 @app.route('/')
 def home():
@@ -90,19 +90,27 @@ def home():
 
 @app.route('/send_otp', methods=['POST'])
 def send_otp():
-    phone = request.form['phone']
+    phone = request.form['phone'].strip()
+
+    # clean phone number
+    if phone.startswith("+91"):
+        phone = phone.replace("+91", "")
+
+    if phone.startswith("91") and len(phone) == 12:
+        phone = phone[2:]
 
     if not can_resend(phone):
-        return jsonify({"status": "error", "message": "Wait before resend"})
+        return jsonify({"status": "error", "message": "Wait before resending OTP"})
 
     generate_otp(phone)
+
     return jsonify({"status": "success", "message": "OTP Sent"})
 
 
 @app.route('/verify_otp', methods=['POST'])
 def verify():
-    phone = request.form['phone']
-    otp = request.form['otp']
+    phone = request.form['phone'].strip()
+    otp = request.form['otp'].strip()
 
     valid, message = verify_otp(phone, otp)
 
@@ -118,23 +126,15 @@ def submit():
     phone = request.form['phone']
     aadhaar = request.form['aadhaar']
 
-    return "Form received successfully (Render test working)"
-
     if not validate_aadhaar(aadhaar):
         return "Invalid Aadhaar"
 
     masked = mask_aadhaar(aadhaar)
 
-    query = "INSERT INTO students (name, father_name, caste, email, phone, aadhaar) VALUES (%s,%s,%s,%s,%s,%s)"
-    values = (name, father_name, caste, email, phone, masked)
-
-    cursor.execute(query, values)
-    db.commit()
-
-    return "Registration Successful"
+    return "Form received successfully"
 
 
+# ---------------- RUN APP ----------------
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
