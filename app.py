@@ -43,6 +43,8 @@ db_pool = pooling.MySQLConnectionPool(
     port=url.port
 )
 
+def get_db():
+    return db_pool.get_connection()
 # ================= TWILIO =================
 ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
