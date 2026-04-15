@@ -22,19 +22,26 @@ if not db_url:
 
 url = urlparse.urlparse(db_url)
 
+import urllib.parse as urlparse
+
+db_url = os.getenv("DB_URL")
+
+if not db_url:
+    raise Exception("DB_URL missing")
+
+print("DB_URL VALUE:", db_url)  # DEBUG
+
+url = urlparse.urlparse(db_url)
+
 db_pool = pooling.MySQLConnectionPool(
     pool_name="student_pool",
     pool_size=5,
     host=url.hostname,
     user=url.username,
     password=url.password,
-    database=url.path[1:],  # remove leading '/'
+    database=url.path[1:],
     port=url.port
 )
-
-def get_db():
-    return db_pool.get_connection()
-
 
 # ================= TWILIO =================
 ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
