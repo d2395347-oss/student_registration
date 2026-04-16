@@ -21,6 +21,7 @@ input {
 button {
     padding: 10px;
     margin-left: 5px;
+    background:green;
 }
 
 .row {

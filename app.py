@@ -14,22 +14,11 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# ================= DATABASE (USE DB_URL FROM RAILWAY) =================
+# ================= DATABASE =================
 db_url = os.getenv("DB_URL")
 
 if not db_url:
-    raise Exception("❌ DB_URL not found in environment variables")
-
-url = urlparse.urlparse(db_url)
-
-import urllib.parse as urlparse
-
-db_url = os.getenv("DB_URL")
-
-if not db_url:
-    raise Exception("DB_URL missing")
-
-print("DB_URL VALUE:", db_url)  # DEBUG
+    raise Exception("❌ DB_URL not found")
 
 url = urlparse.urlparse(db_url)
 
@@ -39,12 +28,31 @@ db_pool = pooling.MySQLConnectionPool(
     host=url.hostname,
     user=url.username,
     password=url.password,
-    database=url.path[1:],
-    port=url.port
+    database=url.path.lstrip("/"),
+    port=url.port or 3306
 )
 
 def get_db():
     return db_pool.get_connection()
+
+
+# ✅ GLOBAL QUERY FUNCTION (FIXED)
+def execute_query(query, params=None, fetch=False):
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(query, params or ())
+        
+        if fetch:
+            return cursor.fetchall()
+        
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
+
+
 # ================= TWILIO =================
 ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
@@ -53,7 +61,7 @@ TWILIO_NUMBER = os.getenv("TWILIO_NUMBER")
 client = Client(ACCOUNT_SID, AUTH_TOKEN)
 
 
-# ================= OTP STORAGE =================
+# ================= OTP =================
 otp_store = {}
 otp_verified = set()
 
@@ -103,7 +111,7 @@ def send_otp():
         return jsonify({"status": "error", "message": "Invalid phone number"})
 
     if is_rate_limited(phone):
-        return jsonify({"status": "error", "message": "Too many OTP requests. Try later."})
+        return jsonify({"status": "error", "message": "Too many OTP requests"})
 
     otp = str(random.randint(100000, 999999))
     otp_store[phone] = {"otp": otp, "time": time.time(), "attempts": 0}
@@ -111,14 +119,14 @@ def send_otp():
 
     try:
         client.messages.create(
-            body=f"Your OTP is {otp}. Valid for 5 minutes.",
+            body=f"Your OTP is {otp}",
             from_=TWILIO_NUMBER,
             to=phone
         )
-        return jsonify({"status": "success", "message": "OTP sent"})
+        return jsonify({"status": "success"})
     except Exception as e:
         print("Twilio error:", e)
-        return jsonify({"status": "error", "message": "Failed to send OTP"})
+        return jsonify({"status": "error"})
 
 
 @app.route('/verify_otp', methods=['POST'])
@@ -133,19 +141,14 @@ def verify_otp():
 
     if time.time() - data["time"] > OTP_EXPIRY:
         del otp_store[phone]
-        return jsonify({"status": "error", "message": "OTP expired"})
-
-    if data["attempts"] >= OTP_MAX_ATTEMPTS:
-        del otp_store[phone]
-        return jsonify({"status": "error", "message": "Too many attempts"})
+        return jsonify({"status": "error", "message": "Expired"})
 
     if otp == data["otp"]:
         otp_verified.add(phone)
         del otp_store[phone]
-        return jsonify({"status": "success", "message": "Phone verified"})
+        return jsonify({"status": "success"})
     else:
-        otp_store[phone]["attempts"] += 1
-        return jsonify({"status": "error", "message": "Invalid OTP"})
+        return jsonify({"status": "error"})
 
 
 @app.route('/submit', methods=['POST'])
@@ -156,51 +159,44 @@ def submit():
     phone = normalize_phone(request.form.get('phone', ''))
     aadhaar = request.form.get('aadhaar', '').strip()
 
-    # Validation
     if not name:
         return jsonify({"status": "error", "message": "Name required"}), 400
 
     if not validate_phone(phone):
-        return jsonify({"status": "error", "message": "Invalid phone"}), 400
+        return jsonify({"status": "error"}), 400
 
     if not validate_aadhaar(aadhaar):
-        return jsonify({"status": "error", "message": "Aadhaar must be 12 digits"}), 400
+        return jsonify({"status": "error"}), 400
 
     if phone not in otp_verified:
         return jsonify({"status": "error", "message": "Verify OTP first"}), 403
 
     aadhaar_hash = hash_aadhaar(aadhaar)
 
-    conn = get_db()
-    cursor = conn.cursor()
-
     try:
-        cursor.execute("""
+        execute_query("""
             INSERT INTO students (name, father_name, caste, phone, aadhaar_hash)
             VALUES (%s, %s, %s, %s, %s)
         """, (name, father, caste, phone, aadhaar_hash))
 
-        conn.commit()
         otp_verified.discard(phone)
 
-        return jsonify({"status": "success", "message": "Registration successful"})
+        return jsonify({"status": "success", "message": "Saved"})
 
     except mysql.connector.IntegrityError:
-        return jsonify({"status": "error", "message": "Already registered"}), 409
+        return jsonify({"status": "error", "message": "Already exists"}), 409
 
-    finally:
-        cursor.close()
-        conn.close()
+    except Exception as e:
+        print("❌ ERROR:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route('/students')
 def students():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, father_name, caste, phone FROM students")
-    data = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    data = execute_query(
+        "SELECT id, name, father_name, caste, phone FROM students",
+        fetch=True
+    )
     return render_template("students.html", students=data)
 
 
