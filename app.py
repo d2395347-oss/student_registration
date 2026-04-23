@@ -2,25 +2,46 @@ import os
 import time
 import hashlib
 import random
-import urllib.parse as urlparse
+import re
+from urllib.parse import urlparse
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from twilio.rest import Client
 import mysql.connector
 from mysql.connector import pooling
+from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
 
+# ================= STARTUP CHECK =================
+print("=" * 50)
+print("Flask starting...")
+print("DB_URL      :", "SET" if os.getenv("DB_URL") else "MISSING - check .env")
+print("Twilio SID  :", "SET" if os.getenv("TWILIO_ACCOUNT_SID") else "MISSING - check .env")
+print("Twilio TOKEN:", "SET" if os.getenv("TWILIO_AUTH_TOKEN") else "MISSING - check .env")
+print("Twilio NUM  :", os.getenv("TWILIO_NUMBER") or "MISSING - check .env")
+print("=" * 50)
+
+# ================= FILE UPLOAD =================
+UPLOAD_FOLDER = "uploads"
+ALLOWED_EXTENSIONS = {"pdf"}
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 # ================= DATABASE =================
-db_url = os.getenv("DB_URL")
+DB_URL = os.getenv("DB_URL")
+if not DB_URL:
+    raise Exception("DB_URL not found in .env file")
 
-if not db_url:
-    raise Exception("❌ DB_URL not found")
-
-url = urlparse.urlparse(db_url)
+url = urlparse(DB_URL)
 
 db_pool = pooling.MySQLConnectionPool(
     pool_name="student_pool",
@@ -35,172 +56,268 @@ db_pool = pooling.MySQLConnectionPool(
 def get_db():
     return db_pool.get_connection()
 
-
-# ✅ GLOBAL QUERY FUNCTION (FIXED)
-def execute_query(query, params=None, fetch=False):
-    conn = get_db()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute(query, params or ())
-        
-        if fetch:
-            return cursor.fetchall()
-        
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
-
-
 # ================= TWILIO =================
-ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+ACCOUNT_SID   = os.getenv("TWILIO_ACCOUNT_SID")
+AUTH_TOKEN    = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_NUMBER = os.getenv("TWILIO_NUMBER")
 
-client = Client(ACCOUNT_SID, AUTH_TOKEN)
+twilio_client = Client(ACCOUNT_SID, AUTH_TOKEN)
 
-
-# ================= OTP =================
-otp_store = {}
+# ================= OTP STORE =================
+otp_store    = {}
 otp_verified = set()
-
-OTP_EXPIRY = 300
-OTP_MAX_ATTEMPTS = 5
-OTP_RATE_LIMIT = 3
-OTP_RATE_WINDOW = 600
-otp_send_log = {}
-
+OTP_EXPIRY   = 300
 
 # ================= HELPERS =================
 def normalize_phone(phone):
-    phone = phone.strip()
-    if not phone.startswith("+91"):
-        phone = "+91" + phone
-    return phone
-
-def validate_phone(phone):
-    digits = phone.replace("+91", "")
-    return digits.isdigit() and len(digits) == 10
-
-def validate_aadhaar(aadhaar):
-    return aadhaar.isdigit() and len(aadhaar) == 12
+    phone = phone.strip() if phone else ""
+    phone = re.sub(r"^\+91", "", phone).strip()
+    return "+91" + phone
 
 def hash_aadhaar(aadhaar):
     return hashlib.sha256(aadhaar.encode()).hexdigest()
 
-def is_rate_limited(phone):
-    now = time.time()
-    history = otp_send_log.get(phone, [])
-    history = [t for t in history if now - t < OTP_RATE_WINDOW]
-    otp_send_log[phone] = history
-    return len(history) >= OTP_RATE_LIMIT
+def valid_aadhaar(aadhaar):
+    return bool(re.fullmatch(r"\d{12}", aadhaar))
 
+def valid_pan(pan):
+    return bool(re.fullmatch(r"[A-Z]{5}[0-9]{4}[A-Z]", pan.upper()))
+
+def valid_mobile(phone):
+    return bool(re.fullmatch(r"\+91\d{10}", phone))
+
+def save_file(file):
+    if file and file.filename and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        file.save(path)
+        return filename
+    return None
 
 # ================= ROUTES =================
-@app.route('/')
+@app.route("/")
 def home():
     return render_template("form.html")
 
-
-@app.route('/send_otp', methods=['POST'])
+# -------- SEND OTP --------
+@app.route("/send_otp", methods=["POST"])
 def send_otp():
-    phone = normalize_phone(request.form.get('phone', ''))
+    raw_phone = request.form.get("phone", "")
+    phone = normalize_phone(raw_phone)
 
-    if not validate_phone(phone):
-        return jsonify({"status": "error", "message": "Invalid phone number"})
+    print(f"\n[OTP] Raw input  : '{raw_phone}'")
+    print(f"[OTP] Normalized : '{phone}'")
+    print(f"[OTP] From number: '{TWILIO_NUMBER}'")
 
-    if is_rate_limited(phone):
-        return jsonify({"status": "error", "message": "Too many OTP requests"})
+    if not valid_mobile(phone):
+        print(f"[OTP] FAILED - invalid mobile format")
+        return jsonify({"status": "error", "message": "Invalid mobile number format"})
 
     otp = str(random.randint(100000, 999999))
-    otp_store[phone] = {"otp": otp, "time": time.time(), "attempts": 0}
-    otp_send_log.setdefault(phone, []).append(time.time())
+    otp_store[phone] = {"otp": otp, "time": time.time()}
+    print(f"[OTP] Generated OTP: {otp} for {phone}")
 
     try:
-        client.messages.create(
-            body=f"Your OTP is {otp}",
+        msg = twilio_client.messages.create(
+            body=f"Your school registration OTP is {otp}. Valid for 5 minutes.",
             from_=TWILIO_NUMBER,
             to=phone
         )
+        print(f"[OTP] SUCCESS - Twilio SID: {msg.sid}")
         return jsonify({"status": "success"})
     except Exception as e:
-        print("Twilio error:", e)
-        return jsonify({"status": "error"})
+        print(f"[OTP] TWILIO ERROR: {e}")
+        return jsonify({"status": "error", "message": str(e)})
 
-
-@app.route('/verify_otp', methods=['POST'])
+# -------- VERIFY OTP --------
+@app.route("/verify_otp", methods=["POST"])
 def verify_otp():
-    phone = normalize_phone(request.form.get('phone', ''))
-    otp = request.form.get('otp', '').strip()
+    raw_phone = request.form.get("phone", "")
+    phone = normalize_phone(raw_phone)
+    otp   = request.form.get("otp", "").strip()
 
-    if phone not in otp_store:
-        return jsonify({"status": "error", "message": "OTP not found"})
+    print(f"\n[VERIFY] Phone : {phone}")
+    print(f"[VERIFY] OTP entered : {otp}")
+    print(f"[VERIFY] OTP stored  : {otp_store.get(phone)}")
 
-    data = otp_store[phone]
+    data = otp_store.get(phone)
+
+    if not data:
+        return jsonify({"status": "error", "message": "No OTP found. Please send OTP first."})
 
     if time.time() - data["time"] > OTP_EXPIRY:
-        del otp_store[phone]
-        return jsonify({"status": "error", "message": "Expired"})
+        otp_store.pop(phone, None)
+        return jsonify({"status": "error", "message": "OTP expired. Please resend."})
 
     if otp == data["otp"]:
         otp_verified.add(phone)
-        del otp_store[phone]
+        otp_store.pop(phone, None)
+        print(f"[VERIFY] SUCCESS for {phone}")
         return jsonify({"status": "success"})
     else:
-        return jsonify({"status": "error"})
+        print(f"[VERIFY] FAILED - expected {data['otp']}, got {otp}")
+        return jsonify({"status": "error", "message": "Incorrect OTP. Please try again."})
 
-
-@app.route('/submit', methods=['POST'])
+# -------- SUBMIT FORM --------
+@app.route("/submit", methods=["POST"])
 def submit():
-    name = request.form.get('name', '').strip()
-    father = request.form.get('father_name', '').strip()
-    caste = request.form.get('caste', '').strip()
-    phone = normalize_phone(request.form.get('phone', ''))
-    aadhaar = request.form.get('aadhaar', '').strip()
+    raw_phone = request.form.get("mobile", "")
+    phone = normalize_phone(raw_phone)
 
-    if not name:
-        return jsonify({"status": "error", "message": "Name required"}), 400
-
-    if not validate_phone(phone):
-        return jsonify({"status": "error"}), 400
-
-    if not validate_aadhaar(aadhaar):
-        return jsonify({"status": "error"}), 400
+    print(f"\n[SUBMIT] Phone: {phone}, Verified: {phone in otp_verified}")
 
     if phone not in otp_verified:
-        return jsonify({"status": "error", "message": "Verify OTP first"}), 403
+        return "Mobile not verified. Please verify OTP first.", 400
 
-    aadhaar_hash = hash_aadhaar(aadhaar)
+    name                 = request.form.get("name", "").strip()
+    father_name          = request.form.get("father_name", "").strip()
+    date_of_birth        = request.form.get("date_of_birth", "").strip()
+    address              = request.form.get("address", "").strip()
+    father_occupation    = request.form.get("father_occupation", "").strip()
+    academic_year        = request.form.get("academic_year", "").strip()
+    previous_institution = request.form.get("previous_institution_name", "").strip()
+    class_applied        = request.form.get("class_applied", "").strip()
+    category             = request.form.get("category", "").strip()
+    gender               = request.form.get("gender", "").strip()
+    special_child        = request.form.get("special_child", "no")
+    extra_activity       = request.form.get("extra_activity", "no")
+    achievement          = request.form.get("achievement", "no")
+    hobbies              = request.form.get("hobbies", "").strip()
+    sports               = request.form.get("sports", "").strip()
+    aadhaar              = request.form.get("aadhaar", "").strip()
+    pan_no               = request.form.get("pan_no", "").strip().upper()
+
+    errors = []
+    if not name:                   errors.append("Name is required")
+    if not father_name:            errors.append("Father name is required")
+    if not date_of_birth:          errors.append("Date of birth is required")
+    if not class_applied:          errors.append("Class is required")
+    if not category:               errors.append("Category is required")
+    if not valid_aadhaar(aadhaar): errors.append("Invalid Aadhaar (must be 12 digits)")
+    if not valid_pan(pan_no):      errors.append("Invalid PAN format (e.g. ABCDE1234F)")
+
+    if errors:
+        return "<br>".join(errors), 400
+
+    aadhaar_hash     = hash_aadhaar(aadhaar)
+    special_file     = save_file(request.files.get("special_file"))
+    extra_file       = save_file(request.files.get("extra_file"))
+    achievement_file = save_file(request.files.get("achievement_file"))
+
+    conn   = get_db()
+    cursor = conn.cursor()
 
     try:
-        execute_query("""
-            INSERT INTO students (name, father_name, caste, phone, aadhaar_hash)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (name, father, caste, phone, aadhaar_hash))
-
+        cursor.execute("""
+            INSERT INTO students (
+                name, father_name, date_of_birth, address,
+                father_occupation, academic_year, previous_institution_name,
+                class_applied, category, gender,
+                phone_no, aadhaar_no, pan_no,
+                special_child, extra_activity, achievement,
+                hobbies, sports,
+                special_file, extra_file, achievement_file,
+                status
+            ) VALUES (
+                %s, %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s,
+                %s, %s,
+                %s, %s, %s,
+                %s
+            )
+        """, (
+            name, father_name, date_of_birth, address,
+            father_occupation, academic_year, previous_institution,
+            class_applied, category, gender,
+            phone, aadhaar_hash, pan_no,
+            special_child, extra_activity, achievement,
+            hobbies, sports,
+            special_file, extra_file, achievement_file,
+            "pending"
+        ))
+        conn.commit()
         otp_verified.discard(phone)
-
-        return jsonify({"status": "success", "message": "Saved"})
-
-    except mysql.connector.IntegrityError:
-        return jsonify({"status": "error", "message": "Already exists"}), 409
+        print(f"[SUBMIT] SUCCESS - Student '{name}' registered")
 
     except Exception as e:
-        print("❌ ERROR:", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
+        conn.rollback()
+        print(f"[SUBMIT] DB ERROR: {e}")
+        return f"Registration failed: {e}", 500
 
+    finally:
+        cursor.close()
+        conn.close()
 
-@app.route('/students')
+    return redirect(url_for("success"))
+
+# -------- SUCCESS PAGE --------
+@app.route("/success")
+def success():
+    return render_template("success.html")
+
+# -------- VIEW STUDENTS --------
+@app.route("/students")
 def students():
-    data = execute_query(
-        "SELECT id, name, father_name, caste, phone FROM students",
-        fetch=True
-    )
+    conn   = get_db()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT id, name, father_name, class_applied, category, gender, phone_no, status
+        FROM students ORDER BY id DESC
+    """)
+    data = cursor.fetchall()
+    cursor.close()
+    conn.close()
     return render_template("students.html", students=data)
 
+# -------- APPROVE --------
+@app.route("/approve/<int:student_id>")
+def approve(student_id):
+    conn   = get_db()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT * FROM students WHERE id=%s", (student_id,))
+    student = cursor.fetchone()
+
+    if not student:
+        cursor.close()
+        conn.close()
+        return "Student not found", 404
+
+    class_name = student["class_applied"]
+    cursor.execute("SELECT * FROM classes WHERE class_name=%s", (class_name,))
+    cls = cursor.fetchone()
+
+    if not cls:
+        cursor.close()
+        conn.close()
+        return f"Class '{class_name}' not found in system.", 400
+
+    if cls["filled_seats"] < cls["total_seats"]:
+        cursor.execute("UPDATE students SET status='accepted' WHERE id=%s", (student_id,))
+        cursor.execute("UPDATE classes SET filled_seats=filled_seats+1 WHERE class_name=%s", (class_name,))
+    else:
+        cursor.execute("UPDATE students SET status='rejected' WHERE id=%s", (student_id,))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect(url_for("students"))
+
+# -------- REJECT --------
+@app.route("/reject/<int:student_id>")
+def reject(student_id):
+    conn   = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE students SET status='rejected' WHERE id=%s", (student_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect(url_for("students"))
 
 # ================= RUN =================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=True)
