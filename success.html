@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Registration Successful</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --primary: #1a3c6e; --success: #1a9e5c; --bg: #f0f4f8; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+.card { background: white; border-radius: 20px; box-shadow: 0 8px 40px rgba(0,0,0,0.12); padding: 50px 40px; text-align: center; max-width: 480px; width: 100%; }
+.icon { font-size: 64px; margin-bottom: 20px; animation: pop 0.5s ease; }
+@keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+h2 { font-family: 'Playfair Display', serif; font-size: 1.8rem; color: var(--primary); margin-bottom: 12px; }
+p { color: #6b7a90; line-height: 1.6; margin-bottom: 28px; }
+.btn { display: inline-block; padding: 13px 32px; background: var(--primary); color: white; border-radius: 10px; text-decoration: none; font-weight: 600; margin: 6px; }
+.btn.outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="icon">🎉</div>
+    <h2>Registration Successful!</h2>
+    <p>Your application has been submitted successfully. You will be notified on your registered mobile number about the admission status.</p>
+    <a href="/" class="btn">New Registration</a>
+    <a href="/students" class="btn outline">View All Students</a>
+</div>
+</body>
+</html>

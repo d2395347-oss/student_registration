@@ -1,5 +1,0 @@
-Flask
-gunicorn
-twilio
-mysql-connector-python
-python-dotenv

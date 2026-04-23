@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Registration</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+        --primary: #1a3c6e;
+        --accent: #e8a020;
+        --success: #1a9e5c;
+        --danger: #d63031;
+        --bg: #f0f4f8;
+        --card: #ffffff;
+        --text: #1e2a3a;
+        --muted: #6b7a90;
+        --border: #d0dbe8;
+        --input-bg: #f8fafc;
+        --radius: 10px;
+        --shadow: 0 4px 24px rgba(26,60,110,0.10);
+    }
+
+    body {
+        font-family: 'DM Sans', sans-serif;
+        background: var(--bg);
+        min-height: 100vh;
+        padding: 30px 16px;
+        color: var(--text);
+    }
+
+    .page-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .school-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--primary);
+        color: white;
+        padding: 10px 24px;
+        border-radius: 50px;
+        margin-bottom: 16px;
+    }
+
+    .school-badge svg { width: 22px; height: 22px; fill: var(--accent); }
+
+    .school-badge span {
+        font-family: 'Playfair Display', serif;
+        font-size: 14px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+    }
+
+    .page-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 2rem;
+        color: var(--primary);
+        line-height: 1.2;
+    }
+
+    .page-subtitle {
+        color: var(--muted);
+        font-size: 14px;
+        margin-top: 6px;
+    }
+
+    .container {
+        max-width: 720px;
+        margin: 0 auto;
+    }
+
+    .card {
+        background: var(--card);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    .card-header {
+        background: var(--primary);
+        color: white;
+        padding: 14px 24px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .card-header .icon {
+        width: 28px; height: 28px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px;
+    }
+
+    .card-header h3 {
+        font-family: 'Playfair Display', serif;
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    .card-body { padding: 24px; }
+
+    .form-group { margin-bottom: 18px; }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    @media(max-width: 580px) { .form-row { grid-template-columns: 1fr; } }
+
+    label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    label .req { color: var(--danger); margin-left: 3px; }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="tel"],
+    input[type="email"],
+    select,
+    textarea {
+        width: 100%;
+        padding: 11px 14px;
+        background: var(--input-bg);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius);
+        font-family: 'DM Sans', sans-serif;
+        font-size: 14px;
+        color: var(--text);
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(26,60,110,0.10);
+        background: white;
+    }
+
+    input.error, select.error { border-color: var(--danger); }
+
+    .error-msg {
+        color: var(--danger);
+        font-size: 12px;
+        margin-top: 4px;
+        display: none;
+    }
+
+    textarea { resize: vertical; min-height: 80px; }
+
+    select { appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7a90' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+
+    .radio-group {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .radio-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text);
+        text-transform: none;
+        letter-spacing: 0;
+        padding: 9px 18px;
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .radio-label input[type="radio"] { display: none; }
+
+    .radio-label:has(input:checked) {
+        border-color: var(--primary);
+        background: rgba(26,60,110,0.06);
+        color: var(--primary);
+    }
+
+    .radio-dot {
+        width: 16px; height: 16px;
+        border: 2px solid var(--border);
+        border-radius: 50%;
+        flex-shrink: 0;
+        transition: all 0.2s;
+        display: flex; align-items: center; justify-content: center;
+    }
+
+    .radio-label:has(input:checked) .radio-dot {
+        border-color: var(--primary);
+        background: var(--primary);
+    }
+
+    .radio-label:has(input:checked) .radio-dot::after {
+        content: '';
+        width: 6px; height: 6px;
+        background: white;
+        border-radius: 50%;
+        display: block;
+    }
+
+    .file-upload {
+        border: 2px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 16px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: var(--input-bg);
+    }
+
+    .file-upload:hover { border-color: var(--primary); background: rgba(26,60,110,0.03); }
+
+    .file-upload input { display: none; }
+
+    .file-upload-label {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 13px;
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 400;
+    }
+
+    .file-upload-label strong { color: var(--primary); }
+
+    .file-name {
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--success);
+        font-weight: 600;
+    }
+
+    .otp-row {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .otp-row input { flex: 1; }
+
+    .btn-otp {
+        padding: 11px 18px;
+        border: none;
+        border-radius: var(--radius);
+        background: var(--primary);
+        color: white;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.2s;
+        flex-shrink: 0;
+    }
+
+    .btn-otp:hover { background: #0f2a52; }
+    .btn-otp:disabled { background: var(--muted); cursor: not-allowed; }
+
+    .otp-status {
+        font-size: 13px;
+        font-weight: 600;
+        margin-top: 6px;
+    }
+
+    .otp-status.success { color: var(--success); }
+    .otp-status.error { color: var(--danger); }
+
+    .progress-bar-wrap {
+        background: var(--border);
+        border-radius: 4px;
+        height: 4px;
+        margin-bottom: 24px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--accent));
+        border-radius: 4px;
+        transition: width 0.4s;
+        width: 0%;
+    }
+
+    .declaration-box {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        background: rgba(26,60,110,0.04);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius);
+        padding: 16px;
+    }
+
+    .declaration-box input[type="checkbox"] {
+        width: 18px; height: 18px;
+        margin-top: 2px;
+        cursor: pointer;
+        accent-color: var(--primary);
+        flex-shrink: 0;
+    }
+
+    .declaration-box p {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.6;
+    }
+
+    .btn-submit {
+        width: 100%;
+        padding: 15px;
+        border: none;
+        border-radius: var(--radius);
+        background: linear-gradient(135deg, var(--primary), #2a5caa);
+        color: white;
+        font-family: 'Playfair Display', serif;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        letter-spacing: 0.5px;
+        transition: all 0.3s;
+        box-shadow: 0 4px 16px rgba(26,60,110,0.3);
+        margin-top: 8px;
+    }
+
+    .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(26,60,110,0.35);
+    }
+
+    .btn-view {
+        width: 100%;
+        padding: 13px;
+        border: 2px solid var(--primary);
+        border-radius: var(--radius);
+        background: transparent;
+        color: var(--primary);
+        font-family: 'DM Sans', sans-serif;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 12px;
+    }
+
+    .btn-view:hover { background: var(--primary); color: white; }
+
+    .section-divider {
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin: 4px 0 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-divider::before,
+    .section-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+    }
+
+    /* Toast */
+    .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: var(--text);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        z-index: 9999;
+        transform: translateY(80px);
+        opacity: 0;
+        transition: all 0.35s;
+    }
+
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+    <div class="school-badge">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <span>Admissions Portal</span>
+    </div>
+    <h1 class="page-title">Student Registration Form</h1>
+    <p class="page-subtitle">Fill in all required fields carefully. Fields marked <span style="color:var(--danger)">*</span> are mandatory.</p>
+</div>
+
+<div class="container">
+
+    <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <form action="/submit" method="POST" enctype="multipart/form-data" onsubmit="checkForm(event)" id="regForm" novalidate>
+
+        <!-- PERSONAL DETAILS -->
+        <div class="card">
+            <div class="card-header">
+                <div class="icon">👤</div>
+                <h3>Personal Details</h3>
+            </div>
+            <div class="card-body">
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Student Name <span class="req">*</span></label>
+                        <input type="text" name="name" id="name" placeholder="Full name as per certificate" required>
+                        <div class="error-msg" id="err-name">Please enter student name</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Father's Name <span class="req">*</span></label>
+                        <input type="text" name="father_name" id="father_name" placeholder="Father's full name" required>
+                        <div class="error-msg" id="err-father">Please enter father's name</div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date of Birth <span class="req">*</span></label>
+                        <input type="date" name="date_of_birth" id="date_of_birth" required>
+                        <div class="error-msg" id="err-dob">Please select date of birth</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Gender <span class="req">*</span></label>
+                        <select name="gender" id="gender" required>
+                            <option value="">Select Gender</option>
+                            <option>Male</option>
+                            <option>Female</option>
+                            <option>Other</option>
+                        </select>
+                        <div class="error-msg" id="err-gender">Please select gender</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Address</label>
+                    <textarea name="address" placeholder="Full residential address"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Father's Occupation</label>
+                        <input type="text" name="father_occupation" placeholder="e.g. Government Employee">
+                    </div>
+                    <div class="form-group">
+                        <label>Category <span class="req">*</span></label>
+                        <select name="category" id="category" required>
+                            <option value="">Select Category</option>
+                            <option>General</option>
+                            <option>OBC</option>
+                            <option>SC</option>
+                            <option>ST</option>
+                        </select>
+                        <div class="error-msg" id="err-category">Please select a category</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ACADEMIC DETAILS -->
+        <div class="card">
+            <div class="card-header">
+                <div class="icon">📚</div>
+                <h3>Academic Details</h3>
+            </div>
+            <div class="card-body">
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Class Applied For <span class="req">*</span></label>
+                        <select name="class_applied" id="class_applied" required>
+                            <option value="">Select Class</option>
+                            <option>Nursery</option><option>LKG</option><option>UKG</option>
+                            <option>CL-I</option><option>CL-II</option><option>CL-III</option>
+                            <option>CL-IV</option><option>CL-V</option><option>CL-VI</option>
+                            <option>CL-VII</option><option>CL-VIII</option><option>CL-IX</option>
+                            <option>CL-X</option><option>CL-XI</option><option>CL-XII</option>
+                        </select>
+                        <div class="error-msg" id="err-class">Please select class</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Previous Academic Year</label>
+                        <input type="text" name="academic_year" placeholder="e.g. 2023-24">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Previous Institution Name</label>
+                    <input type="text" name="previous_institution_name" placeholder="Name of last attended school">
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ACTIVITIES & ACHIEVEMENTS -->
+        <div class="card">
+            <div class="card-header">
+                <div class="icon">🏆</div>
+                <h3>Activities & Achievements</h3>
+            </div>
+            <div class="card-body">
+
+                <div class="form-group">
+                    <label>Special Child?</label>
+                    <div class="radio-group">
+                        <label class="radio-label"><input type="radio" name="special_child" value="yes"><div class="radio-dot"></div> Yes</label>
+                        <label class="radio-label"><input type="radio" name="special_child" value="no" checked><div class="radio-dot"></div> No</label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="special-file-wrap" style="display:none">
+                    <label>Upload Special Child Certificate (PDF)</label>
+                    <div class="file-upload" onclick="document.getElementById('special_file').click()">
+                        <input type="file" id="special_file" name="special_file" accept="application/pdf" onchange="showFile(this,'special-fname')">
+                        <label class="file-upload-label">📄 Click to upload PDF &nbsp;|&nbsp; <strong>Browse File</strong></label>
+                        <div class="file-name" id="special-fname"></div>
+                    </div>
+                </div>
+
+                <div class="section-divider">Extra Curricular</div>
+
+                <div class="form-group">
+                    <label>Extra Curricular Activity?</label>
+                    <div class="radio-group">
+                        <label class="radio-label"><input type="radio" name="extra_activity" value="yes"><div class="radio-dot"></div> Yes</label>
+                        <label class="radio-label"><input type="radio" name="extra_activity" value="no" checked><div class="radio-dot"></div> No</label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="extra-file-wrap" style="display:none">
+                    <label>Upload Activity Certificate (PDF)</label>
+                    <div class="file-upload" onclick="document.getElementById('extra_file').click()">
+                        <input type="file" id="extra_file" name="extra_file" accept="application/pdf" onchange="showFile(this,'extra-fname')">
+                        <label class="file-upload-label">📄 Click to upload PDF &nbsp;|&nbsp; <strong>Browse File</strong></label>
+                        <div class="file-name" id="extra-fname"></div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Hobbies</label>
+                        <input type="text" name="hobbies" placeholder="e.g. Reading, Painting">
+                    </div>
+                    <div class="form-group">
+                        <label>Sports</label>
+                        <input type="text" name="sports" placeholder="e.g. Cricket, Swimming">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Any Achievement?</label>
+                    <div class="radio-group">
+                        <label class="radio-label"><input type="radio" name="achievement" value="yes"><div class="radio-dot"></div> Yes</label>
+                        <label class="radio-label"><input type="radio" name="achievement" value="no" checked><div class="radio-dot"></div> No</label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="ach-file-wrap" style="display:none">
+                    <label>Upload Achievement Certificate (PDF)</label>
+                    <div class="file-upload" onclick="document.getElementById('achievement_file').click()">
+                        <input type="file" id="achievement_file" name="achievement_file" accept="application/pdf" onchange="showFile(this,'ach-fname')">
+                        <label class="file-upload-label">📄 Click to upload PDF &nbsp;|&nbsp; <strong>Browse File</strong></label>
+                        <div class="file-name" id="ach-fname"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- CONTACT & VERIFICATION -->
+        <div class="card">
+            <div class="card-header">
+                <div class="icon">📱</div>
+                <h3>Contact & Verification</h3>
+            </div>
+            <div class="card-body">
+
+                <div class="form-group">
+                    <label>Mobile Number <span class="req">*</span></label>
+                    <div class="otp-row">
+                        <input type="tel" id="phone" name="mobile" placeholder="10-digit mobile number" maxlength="10" required>
+                        <button type="button" class="btn-otp" id="btnSendOtp" onclick="sendOTP()">Send OTP</button>
+                    </div>
+                    <div class="error-msg" id="err-phone">Please enter a valid 10-digit mobile number</div>
+                </div>
+
+                <div class="form-group" id="otp-section" style="display:none">
+                    <label>Enter OTP <span class="req">*</span></label>
+                    <div class="otp-row">
+                        <input type="text" id="otp" placeholder="6-digit OTP" maxlength="6">
+                        <button type="button" class="btn-otp" onclick="verifyOTP()">Verify OTP</button>
+                    </div>
+                    <div class="otp-status" id="otpStatus"></div>
+                </div>
+
+                <div class="section-divider">Identity Documents</div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Aadhaar Number <span class="req">*</span></label>
+                        <input type="text" name="aadhaar" id="aadhaar" placeholder="12-digit Aadhaar" maxlength="12" required>
+                        <div class="error-msg" id="err-aadhaar">Aadhaar must be exactly 12 digits</div>
+                    </div>
+                    <div class="form-group">
+                        <label>PAN Number <span class="req">*</span></label>
+                        <input type="text" name="pan_no" id="pan_no" placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform:uppercase" required>
+                        <div class="error-msg" id="err-pan">Invalid PAN format (e.g. ABCDE1234F)</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- DECLARATION -->
+        <div class="card">
+            <div class="card-body">
+                <div class="declaration-box">
+                    <input type="checkbox" name="declaration" id="declaration" required>
+                    <p>I hereby declare that all the information provided in this registration form is true, complete, and correct to the best of my knowledge. I understand that providing false information may lead to cancellation of admission.</p>
+                </div>
+
+                <button type="submit" class="btn-submit">Submit Registration →</button>
+            </div>
+        </div>
+
+    </form>
+
+    <button class="btn-view" onclick="viewStudents()">📋 View All Students</button>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let otpVerified = false;
+
+// ===== PROGRESS BAR =====
+function updateProgress() {
+    const required = document.querySelectorAll('[required]');
+    let filled = 0;
+    required.forEach(el => {
+        if (el.type === 'checkbox') { if (el.checked) filled++; }
+        else if (el.value.trim()) filled++;
+    });
+    const pct = Math.round((filled / required.length) * 100);
+    document.getElementById('progressBar').style.width = pct + '%';
+}
+
+document.querySelectorAll('input,select,textarea').forEach(el => {
+    el.addEventListener('input', updateProgress);
+    el.addEventListener('change', updateProgress);
+});
+
+// ===== TOAST =====
+function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ===== FILE DISPLAY =====
+function showFile(input, targetId) {
+    document.getElementById(targetId).textContent = input.files[0]?.name || '';
+}
+
+// ===== CONDITIONAL FILE UPLOADS =====
+document.querySelectorAll('[name="special_child"]').forEach(r => {
+    r.addEventListener('change', () => {
+        document.getElementById('special-file-wrap').style.display = r.value === 'yes' ? 'block' : 'none';
+    });
+});
+
+document.querySelectorAll('[name="extra_activity"]').forEach(r => {
+    r.addEventListener('change', () => {
+        document.getElementById('extra-file-wrap').style.display = r.value === 'yes' ? 'block' : 'none';
+    });
+});
+
+document.querySelectorAll('[name="achievement"]').forEach(r => {
+    r.addEventListener('change', () => {
+        document.getElementById('ach-file-wrap').style.display = r.value === 'yes' ? 'block' : 'none';
+    });
+});
+
+// ===== VALIDATION HELPERS =====
+function showErr(id, show) {
+    const el = document.getElementById('err-' + id);
+    if (el) el.style.display = show ? 'block' : 'none';
+}
+
+function markField(id, valid) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('error', !valid);
+    showErr(id, !valid);
+}
+
+// ===== OTP =====
+function sendOTP() {
+    let phone = document.getElementById('phone').value.trim();
+
+    // Accept 10 digits — strip any leading +91 if user typed it
+    phone = phone.replace(/^\+91/, '').replace(/\s/g, '');
+
+    if (phone.length !== 10 || !/^\d{10}$/.test(phone)) {
+        showErr('phone', true);
+        showToast('Please enter a valid 10-digit mobile number', 'error');
+        return;
+    }
+
+    // Update field with clean 10-digit value
+    document.getElementById('phone').value = phone;
+    showErr('phone', false);
+
+    const btn = document.getElementById('btnSendOtp');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    // Show OTP section immediately so user knows to wait
+    document.getElementById('otp-section').style.display = 'block';
+
+    fetch('/send_otp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'phone=' + encodeURIComponent(phone)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('✅ OTP sent to +91' + phone, 'success');
+            btn.textContent = 'Resend OTP';
+        } else {
+            showToast('❌ ' + (data.message || 'Failed to send OTP'), 'error');
+            btn.textContent = 'Retry Send OTP';
+        }
+        btn.disabled = false;
+    })
+    .catch(err => {
+        console.error('OTP fetch error:', err);
+        showToast('❌ Network error. Make sure Flask is running.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Send OTP';
+    });
+}
+
+function verifyOTP() {
+    const phone  = document.getElementById('phone').value.trim();
+    const otp    = document.getElementById('otp').value.trim();
+    const status = document.getElementById('otpStatus');
+
+    if (!otp) {
+        status.textContent = '⚠️ Please enter the OTP first';
+        status.className = 'otp-status error';
+        return;
+    }
+
+    fetch('/verify_otp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'phone=' + encodeURIComponent(phone) + '&otp=' + encodeURIComponent(otp)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            otpVerified = true;
+            status.textContent = '✅ Mobile verified successfully';
+            status.className = 'otp-status success';
+            showToast('✅ OTP verified!', 'success');
+        } else {
+            status.textContent = '❌ ' + (data.message || 'Incorrect OTP. Try again.');
+            status.className = 'otp-status error';
+            showToast('❌ OTP verification failed', 'error');
+        }
+    })
+    .catch(err => {
+        console.error('Verify OTP error:', err);
+        status.textContent = '❌ Network error during verification';
+        status.className = 'otp-status error';
+    });
+}
+
+// ===== FORM VALIDATION =====
+function checkForm(event) {
+    let valid = true;
+
+    const name = document.getElementById('name').value.trim();
+    markField('name', name.length > 1);
+    if (name.length <= 1) valid = false;
+
+    const father = document.getElementById('father_name').value.trim();
+    markField('father_name', father.length > 1);
+    if (father.length <= 1) valid = false;
+
+    const dob = document.getElementById('date_of_birth').value;
+    markField('date_of_birth', !!dob);
+    if (!dob) valid = false;
+
+    const gender = document.getElementById('gender').value;
+    markField('gender', !!gender);
+    if (!gender) valid = false;
+
+    const category = document.getElementById('category').value;
+    markField('category', !!category);
+    if (!category) valid = false;
+
+    const classApplied = document.getElementById('class_applied').value;
+    markField('class_applied', !!classApplied);
+    if (!classApplied) valid = false;
+
+    const phone = document.getElementById('phone').value.trim();
+    const phoneOk = /^\d{10}$/.test(phone);
+    markField('phone', phoneOk);
+    if (!phoneOk) valid = false;
+
+    const aadhaar = document.getElementById('aadhaar').value.trim();
+    const aadhaarOk = /^\d{12}$/.test(aadhaar);
+    markField('aadhaar', aadhaarOk);
+    if (!aadhaarOk) valid = false;
+
+    const pan = document.getElementById('pan_no').value.trim().toUpperCase();
+    const panOk = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan);
+    markField('pan_no', panOk);
+    if (!panOk) valid = false;
+
+    if (!otpVerified) {
+        showToast('Please verify your mobile number with OTP', 'error');
+        valid = false;
+    }
+
+    if (!document.getElementById('declaration').checked) {
+        showToast('Please accept the declaration', 'error');
+        valid = false;
+    }
+
+    if (!valid) {
+        event.preventDefault();
+        showToast('Please fix the errors above', 'error');
+        document.querySelector('.error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+function viewStudents() {
+    window.location.href = '/students';
+}
+
+// Init progress
+updateProgress();
+</script>
+</body>
+</html>

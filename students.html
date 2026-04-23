@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>All Students</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+    --primary: #1a3c6e; --accent: #e8a020;
+    --success: #1a9e5c; --danger: #d63031; --pending: #e67e22;
+    --bg: #f0f4f8; --card: #fff; --text: #1e2a3a; --muted: #6b7a90; --border: #d0dbe8;
+}
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); padding: 30px 16px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+h1 { font-family: 'Playfair Display', serif; color: var(--primary); font-size: 1.8rem; }
+.btn-back { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.stat-card { background: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); text-align: center; flex: 1; min-width: 120px; }
+.stat-card .num { font-size: 2rem; font-weight: 700; font-family: 'Playfair Display', serif; color: var(--primary); }
+.stat-card .lbl { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.card { background: white; border-radius: 14px; box-shadow: 0 2px 16px rgba(0,0,0,0.07); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+thead { background: var(--primary); color: white; }
+th { padding: 14px 16px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+td { padding: 13px 16px; font-size: 14px; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(26,60,110,0.03); }
+.badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: capitalize; }
+.badge.pending  { background: #fff3e0; color: var(--pending); }
+.badge.accepted { background: #e8f5e9; color: var(--success); }
+.badge.rejected { background: #fdecea; color: var(--danger); }
+.actions { display: flex; gap: 6px; }
+.btn-approve, .btn-reject { padding: 6px 14px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn-approve { background: var(--success); color: white; }
+.btn-reject  { background: var(--danger);  color: white; }
+.empty { text-align: center; padding: 40px; color: var(--muted); }
+@media(max-width:700px) {
+    table { display: block; overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>📋 Student Registrations</h1>
+    <a href="/" class="btn-back">+ New Registration</a>
+</div>
+
+{% set total    = students | length %}
+{% set accepted = students | selectattr('status','equalto','accepted') | list | length %}
+{% set rejected = students | selectattr('status','equalto','rejected') | list | length %}
+{% set pending  = students | selectattr('status','equalto','pending')  | list | length %}
+
+<div class="stats">
+    <div class="stat-card"><div class="num">{{ total }}</div><div class="lbl">Total</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--pending)">{{ pending }}</div><div class="lbl">Pending</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--success)">{{ accepted }}</div><div class="lbl">Accepted</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--danger)">{{ rejected }}</div><div class="lbl">Rejected</div></div>
+</div>
+
+<div class="card">
+    {% if students %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Father</th>
+                <th>Class</th>
+                <th>Category</th>
+                <th>Gender</th>
+                <th>Mobile</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in students %}
+            <tr>
+                <td>{{ s.id }}</td>
+                <td><strong>{{ s.name }}</strong></td>
+                <td>{{ s.father_name }}</td>
+                <td>{{ s.class_applied }}</td>
+                <td>{{ s.category }}</td>
+                <td>{{ s.gender }}</td>
+                <td>{{ s.phone_no }}</td>
+                <td><span class="badge {{ s.status }}">{{ s.status }}</span></td>
+                <td>
+                    {% if s.status == 'pending' %}
+                    <div class="actions">
+                        <a href="/approve/{{ s.id }}" class="btn-approve">✔ Accept</a>
+                        <a href="/reject/{{ s.id }}"  class="btn-reject">✖ Reject</a>
+                    </div>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No registrations yet.</div>
+    {% endif %}
+</div>
+
+</body>
+</html>
