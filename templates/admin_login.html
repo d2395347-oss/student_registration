@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --primary: #1a3c6e; --danger: #d63031; --bg: #f0f4f8; --border: #d0dbe8; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+.card { background: white; border-radius: 20px; box-shadow: 0 8px 40px rgba(0,0,0,0.12); padding: 40px; width: 100%; max-width: 400px; }
+.icon { font-size: 48px; text-align: center; margin-bottom: 16px; }
+h2 { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--primary); text-align: center; margin-bottom: 6px; }
+p { color: #6b7a90; font-size: 13px; text-align: center; margin-bottom: 28px; }
+label { display: block; font-size: 12px; font-weight: 600; color: #6b7a90; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; margin-bottom: 16px; }
+input:focus { outline: none; border-color: var(--primary); }
+button { width: 100%; padding: 13px; background: var(--primary); color: white; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
+button:hover { background: #0f2a52; }
+.error { background: #fdecea; color: var(--danger); padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-bottom: 16px; text-align: center; }
+.back { text-align: center; margin-top: 16px; }
+.back a { color: var(--primary); font-size: 13px; text-decoration: none; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="icon">🔐</div>
+    <h2>Admin Login</h2>
+    <p>This area is restricted to school administrators only.</p>
+
+    {% if error %}
+    <div class="error">❌ {{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/admin/login">
+        <label>Username</label>
+        <input type="text" name="username" placeholder="Enter admin username" required>
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Enter password" required>
+        <button type="submit">Login to Admin Panel</button>
+    </form>
+
+    <div class="back">
+        <a href="/">← Back to Registration Form</a>
+    </div>
+</div>
+</body>
+</html>

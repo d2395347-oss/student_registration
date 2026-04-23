@@ -4,8 +4,9 @@ import hashlib
 import random
 import re
 from urllib.parse import urlparse
+from functools import wraps
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from twilio.rest import Client
 import mysql.connector
 from mysql.connector import pooling
@@ -15,6 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "school_secret_key_2024")
 
 # ================= STARTUP CHECK =================
 print("=" * 50)
@@ -24,6 +26,11 @@ print("Twilio SID  :", "SET" if os.getenv("TWILIO_ACCOUNT_SID") else "MISSING - 
 print("Twilio TOKEN:", "SET" if os.getenv("TWILIO_AUTH_TOKEN") else "MISSING - check .env")
 print("Twilio NUM  :", os.getenv("TWILIO_NUMBER") or "MISSING - check .env")
 print("=" * 50)
+
+# ================= ADMIN CREDENTIALS =================
+# Change these in your .env file!
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "school@123")
 
 # ================= FILE UPLOAD =================
 UPLOAD_FOLDER = "uploads"
@@ -94,6 +101,15 @@ def save_file(file):
         return filename
     return None
 
+# ================= ADMIN LOGIN REQUIRED =================
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("admin_logged_in"):
+            return redirect(url_for("admin_login"))
+        return f(*args, **kwargs)
+    return decorated
+
 # ================= ROUTES =================
 @app.route("/")
 def home():
@@ -136,9 +152,7 @@ def verify_otp():
     phone = normalize_phone(raw_phone)
     otp   = request.form.get("otp", "").strip()
 
-    print(f"\n[VERIFY] Phone : {phone}")
-    print(f"[VERIFY] OTP entered : {otp}")
-    print(f"[VERIFY] OTP stored  : {otp_store.get(phone)}")
+    print(f"\n[VERIFY] Phone : {phone}, OTP: {otp}")
 
     data = otp_store.get(phone)
 
@@ -163,8 +177,6 @@ def verify_otp():
 def submit():
     raw_phone = request.form.get("mobile", "")
     phone = normalize_phone(raw_phone)
-
-    print(f"\n[SUBMIT] Phone: {phone}, Verified: {phone in otp_verified}")
 
     if phone not in otp_verified:
         return "Mobile not verified. Please verify OTP first.", 400
@@ -258,9 +270,56 @@ def submit():
 def success():
     return render_template("success.html")
 
-# -------- VIEW STUDENTS --------
+# -------- PUBLIC: CHECK STATUS BY PHONE --------
 @app.route("/students")
 def students():
+    return render_template("students.html")
+
+@app.route("/check_status", methods=["POST"])
+def check_status():
+    raw_phone = request.form.get("phone", "")
+    phone = normalize_phone(raw_phone)
+
+    conn   = get_db()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT name, father_name, class_applied, category, gender, phone_no, status
+        FROM students WHERE phone_no = %s ORDER BY id DESC LIMIT 1
+    """, (phone,))
+    student = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if student:
+        return jsonify({"found": True, "student": student})
+    else:
+        return jsonify({"found": False})
+
+# -------- ADMIN LOGIN --------
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session["admin_logged_in"] = True
+            return redirect(url_for("admin_panel"))
+        else:
+            return render_template("admin_login.html", error="Invalid username or password")
+
+    return render_template("admin_login.html", error=None)
+
+# -------- ADMIN LOGOUT --------
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin_logged_in", None)
+    return redirect(url_for("admin_login"))
+
+# -------- ADMIN PANEL (PROTECTED) --------
+@app.route("/admin")
+@admin_required
+def admin_panel():
     conn   = get_db()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
@@ -270,10 +329,11 @@ def students():
     data = cursor.fetchall()
     cursor.close()
     conn.close()
-    return render_template("students.html", students=data)
+    return render_template("admin.html", students=data)
 
-# -------- APPROVE --------
+# -------- APPROVE (ADMIN ONLY) --------
 @app.route("/approve/<int:student_id>")
+@admin_required
 def approve(student_id):
     conn   = get_db()
     cursor = conn.cursor(dictionary=True)
@@ -304,10 +364,11 @@ def approve(student_id):
     conn.commit()
     cursor.close()
     conn.close()
-    return redirect(url_for("students"))
+    return redirect(url_for("admin_panel"))
 
-# -------- REJECT --------
+# -------- REJECT (ADMIN ONLY) --------
 @app.route("/reject/<int:student_id>")
+@admin_required
 def reject(student_id):
     conn   = get_db()
     cursor = conn.cursor()
@@ -315,8 +376,9 @@ def reject(student_id):
     conn.commit()
     cursor.close()
     conn.close()
-    return redirect(url_for("students"))
-# Handle wrong method errors gracefully
+    return redirect(url_for("admin_panel"))
+
+# -------- ERROR HANDLERS --------
 @app.errorhandler(405)
 def method_not_allowed(e):
     return redirect(url_for("home"))

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Check Registration Status</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+    --primary: #1a3c6e; --success: #1a9e5c; --danger: #d63031; --pending: #e67e22;
+    --bg: #f0f4f8; --card: #fff; --text: #1e2a3a; --muted: #6b7a90; --border: #d0dbe8;
+}
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); padding: 30px 16px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+h1 { font-family: 'Playfair Display', serif; color: var(--primary); font-size: 1.8rem; }
+.btn { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+.search-box { background: white; border-radius: 14px; box-shadow: 0 2px 16px rgba(0,0,0,0.07); padding: 24px; margin-bottom: 20px; }
+.search-box label { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px; }
+.search-row { display: flex; gap: 10px; }
+.search-row input { flex: 1; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; }
+.search-row input:focus { outline: none; border-color: var(--primary); }
+.search-row button { padding: 11px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.result-card { background: white; border-radius: 14px; box-shadow: 0 2px 16px rgba(0,0,0,0.07); padding: 28px; display: none; }
+.result-card h3 { font-family: 'Playfair Display', serif; font-size: 1.3rem; color: var(--primary); margin-bottom: 16px; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media(max-width:500px) { .info-grid { grid-template-columns: 1fr; } }
+.info-item { background: var(--bg); border-radius: 8px; padding: 12px 16px; }
+.info-item .lbl { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.info-item .val { font-size: 15px; font-weight: 600; color: var(--text); }
+.badge { display: inline-block; padding: 6px 18px; border-radius: 20px; font-size: 14px; font-weight: 700; }
+.badge.pending  { background: #fff3e0; color: var(--pending); }
+.badge.accepted { background: #e8f5e9; color: var(--success); }
+.badge.rejected { background: #fdecea; color: var(--danger); }
+.not-found { text-align: center; padding: 30px; color: var(--muted); display: none; }
+.not-found .icon { font-size: 40px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🔍 Check Registration Status</h1>
+    <a href="/" class="btn">+ New Registration</a>
+</div>
+
+<div class="search-box">
+    <label>Enter your Mobile Number to check status</label>
+    <div class="search-row">
+        <input type="tel" id="searchPhone" placeholder="Enter 10-digit mobile number" maxlength="10">
+        <button onclick="checkStatus()">Check Status</button>
+    </div>
+</div>
+
+<div class="result-card" id="resultCard">
+    <h3>Registration Details</h3>
+    <div class="info-grid" id="infoGrid"></div>
+</div>
+
+<div class="not-found" id="notFound">
+    <div class="icon">😕</div>
+    <p>No registration found for this mobile number.</p>
+</div>
+
+<script>
+function checkStatus() {
+    const phone = document.getElementById('searchPhone').value.trim();
+    if (!phone || phone.length !== 10) {
+        alert('Please enter a valid 10-digit mobile number');
+        return;
+    }
+
+    fetch('/check_status', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'phone=' + encodeURIComponent(phone)
+    })
+    .then(r => r.json())
+    .then(data => {
+        const resultCard = document.getElementById('resultCard');
+        const notFound   = document.getElementById('notFound');
+        const infoGrid   = document.getElementById('infoGrid');
+
+        if (data.found) {
+            const s = data.student;
+            infoGrid.innerHTML = `
+                <div class="info-item"><div class="lbl">Student Name</div><div class="val">${s.name}</div></div>
+                <div class="info-item"><div class="lbl">Father's Name</div><div class="val">${s.father_name}</div></div>
+                <div class="info-item"><div class="lbl">Class Applied</div><div class="val">${s.class_applied}</div></div>
+                <div class="info-item"><div class="lbl">Category</div><div class="val">${s.category}</div></div>
+                <div class="info-item"><div class="lbl">Gender</div><div class="val">${s.gender || '-'}</div></div>
+                <div class="info-item"><div class="lbl">Mobile</div><div class="val">${s.phone_no}</div></div>
+                <div class="info-item" style="grid-column:1/-1">
+                    <div class="lbl">Admission Status</div>
+                    <div class="val"><span class="badge ${s.status}">${s.status.toUpperCase()}</span></div>
+                </div>
+            `;
+            resultCard.style.display = 'block';
+            notFound.style.display   = 'none';
+        } else {
+            resultCard.style.display = 'none';
+            notFound.style.display   = 'block';
+        }
+    })
+    .catch(() => alert('Error checking status. Please try again.'));
+}
+
+// Allow pressing Enter
+document.getElementById('searchPhone').addEventListener('keypress', e => {
+    if (e.key === 'Enter') checkStatus();
+});
+</script>
+</body>
+</html>
