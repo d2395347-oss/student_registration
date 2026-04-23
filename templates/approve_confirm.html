@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Confirm Approval</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+    --primary: #1a3c6e;
+    --success: #1a9e5c;
+    --danger: #d63031;
+    --bg: #f0f4f8;
+    --border: #d0dbe8;
+    --muted: #6b7a90;
+}
+body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+.card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+    padding: 40px;
+    width: 100%;
+    max-width: 480px;
+}
+.icon { font-size: 52px; text-align: center; margin-bottom: 16px; }
+h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    color: var(--primary);
+    text-align: center;
+    margin-bottom: 6px;
+}
+.student-info {
+    background: #f0f4f8;
+    border-radius: 10px;
+    padding: 16px;
+    margin: 20px 0;
+    text-align: center;
+}
+.student-info .name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+.student-info .class {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+}
+label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    margin-top: 16px;
+}
+input[type="date"], input[type="time"], input[type="text"] {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: #1e2a3a;
+}
+input:focus { outline: none; border-color: var(--primary); }
+.preview-msg {
+    background: #e8f5e9;
+    border: 1.5px solid #a5d6a7;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 20px;
+    font-size: 13px;
+    color: #2e7d32;
+    line-height: 1.7;
+    white-space: pre-line;
+}
+.preview-msg strong { display: block; margin-bottom: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--success); }
+.btn-row { display: flex; gap: 10px; margin-top: 24px; }
+.btn-confirm {
+    flex: 1;
+    padding: 13px;
+    background: var(--success);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-cancel {
+    flex: 1;
+    padding: 13px;
+    background: transparent;
+    color: var(--danger);
+    border: 2px solid var(--danger);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-confirm:hover { background: #157a46; }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="icon">✅</div>
+    <h2>Confirm Acceptance</h2>
+
+    <div class="student-info">
+        <div class="name">{{ student.name }}</div>
+        <div class="class">Class Applied: {{ student.class_applied }}</div>
+        <div class="class">Mobile: {{ student.phone_no }}</div>
+    </div>
+
+    <form method="POST" action="/approve/{{ student.id }}">
+
+        <label>Fees Submission Date <span style="color:red">*</span></label>
+        <input type="date" name="fees_date" id="fees_date" required
+               min="{{ today }}" onchange="updatePreview()">
+
+        <label>Reporting Time</label>
+        <input type="text" name="fees_time" id="fees_time"
+               value="9:00 AM" placeholder="e.g. 9:00 AM" onchange="updatePreview()">
+
+        <div class="preview-msg" id="previewMsg">
+            <strong>📱 SMS Preview (sent to parent)</strong>
+            Select a date above to preview the SMS message.
+        </div>
+
+        <div class="btn-row">
+            <a href="/admin" class="btn-cancel">✖ Cancel</a>
+            <button type="submit" class="btn-confirm">✔ Confirm & Send SMS</button>
+        </div>
+
+    </form>
+</div>
+
+<script>
+const studentName  = "{{ student.name }}";
+const classApplied = "{{ student.class_applied }}";
+
+function updatePreview() {
+    const date = document.getElementById('fees_date').value;
+    const time = document.getElementById('fees_time').value || '9:00 AM';
+    const preview = document.getElementById('previewMsg');
+
+    if (!date) {
+        preview.innerHTML = '<strong>📱 SMS Preview (sent to parent)</strong>Select a date above to preview the SMS message.';
+        return;
+    }
+
+    // Format date nicely
+    const d = new Date(date);
+    const formatted = d.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    preview.innerHTML = `<strong>📱 SMS Preview (sent to parent)</strong>Dear Parent,
+
+Congratulations! ${studentName}'s admission application for ${classApplied} has been ACCEPTED.
+
+Please visit the school on ${formatted} at ${time} for fees submission.
+
+Kindly bring all original documents.
+- School Administration`;
+}
+</script>
+</body>
+</html>

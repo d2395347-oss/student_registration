@@ -1,4 +1,5 @@
 import os
+from datetime import date
 import time
 import hashlib
 import random
@@ -332,9 +333,25 @@ def admin_panel():
     return render_template("admin.html", students=data)
 
 # -------- APPROVE (ADMIN ONLY) --------
-@app.route("/approve/<int:student_id>")
+@app.route("/approve/<int:student_id>", methods=["GET", "POST"])
 @admin_required
 def approve(student_id):
+    # GET: show date picker confirmation page
+    if request.method == "GET":
+        conn   = get_db()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, name, class_applied, phone_no FROM students WHERE id=%s", (student_id,))
+        student = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if not student:
+            return "Student not found", 404
+        return render_template("approve_confirm.html", student=student, today=date.today().isoformat())
+
+    # POST: process approval with fees date
+    fees_date = request.form.get("fees_date", "").strip()
+    fees_time = request.form.get("fees_time", "9:00 AM").strip()
+
     conn   = get_db()
     cursor = conn.cursor(dictionary=True)
 
@@ -358,10 +375,43 @@ def approve(student_id):
     if cls["filled_seats"] < cls["total_seats"]:
         cursor.execute("UPDATE students SET status='accepted' WHERE id=%s", (student_id,))
         cursor.execute("UPDATE classes SET filled_seats=filled_seats+1 WHERE class_name=%s", (class_name,))
+        conn.commit()
+
+        # Send acceptance SMS with fees date
+        phone    = student["phone_no"]
+        name     = student["name"]
+        sms_body = (
+            f"Dear Parent,\n\n"
+            f"Congratulations! {name}'s admission application for {class_name} has been ACCEPTED.\n\n"
+            f"Please visit the school on {fees_date} at {fees_time} for fees submission.\n\n"
+            f"Kindly bring all original documents.\n"
+            f"- School Administration"
+        )
+        try:
+            twilio_client.messages.create(body=sms_body, from_=TWILIO_NUMBER, to=phone)
+            print(f"[SMS] Acceptance SMS sent to {phone}")
+        except Exception as e:
+            print(f"[SMS] ERROR: {e}")
+
     else:
         cursor.execute("UPDATE students SET status='rejected' WHERE id=%s", (student_id,))
+        conn.commit()
 
-    conn.commit()
+        # Notify seats full
+        phone    = student["phone_no"]
+        name     = student["name"]
+        sms_body = (
+            f"Dear Parent,\n\n"
+            f"We regret that {name}'s application for {class_name} "
+            f"could not be accepted as all seats are full.\n\n"
+            f"- School Administration"
+        )
+        try:
+            twilio_client.messages.create(body=sms_body, from_=TWILIO_NUMBER, to=phone)
+            print(f"[SMS] Seats-full rejection SMS sent to {phone}")
+        except Exception as e:
+            print(f"[SMS] ERROR: {e}")
+
     cursor.close()
     conn.close()
     return redirect(url_for("admin_panel"))
@@ -371,9 +421,31 @@ def approve(student_id):
 @admin_required
 def reject(student_id):
     conn   = get_db()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE students SET status='rejected' WHERE id=%s", (student_id,))
-    conn.commit()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT name, class_applied, phone_no FROM students WHERE id=%s", (student_id,))
+    student = cursor.fetchone()
+
+    if student:
+        cursor.execute("UPDATE students SET status='rejected' WHERE id=%s", (student_id,))
+        conn.commit()
+
+        # Send rejection SMS
+        phone    = student["phone_no"]
+        name     = student["name"]
+        sms_body = (
+            f"Dear Parent,\n\n"
+            f"We regret to inform you that {name}'s admission application "
+            f"has not been accepted at this time.\n\n"
+            f"For more information, please contact the school office.\n"
+            f"- School Administration"
+        )
+        try:
+            twilio_client.messages.create(body=sms_body, from_=TWILIO_NUMBER, to=phone)
+            print(f"[SMS] Rejection SMS sent to {phone}")
+        except Exception as e:
+            print(f"[SMS] ERROR: {e}")
+
     cursor.close()
     conn.close()
     return redirect(url_for("admin_panel"))
