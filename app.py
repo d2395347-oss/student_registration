@@ -316,6 +316,14 @@ def reject(student_id):
     cursor.close()
     conn.close()
     return redirect(url_for("students"))
+# Handle wrong method errors gracefully
+@app.errorhandler(405)
+def method_not_allowed(e):
+    return redirect(url_for("home"))
+
+@app.errorhandler(404)
+def not_found(e):
+    return redirect(url_for("home"))
 
 # ================= RUN =================
 if __name__ == "__main__":
