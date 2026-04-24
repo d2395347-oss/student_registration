@@ -63,12 +63,47 @@ tr:hover td { background: rgba(26,60,110,0.03); }
     <div class="stat-card"><div class="num" style="color:var(--danger)">{{ rejected }}</div><div class="lbl">Rejected</div></div>
 </div>
 
+<!-- Search & Filter Bar -->
+<div style="background:white;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,0.07);padding:20px;margin-bottom:16px;">
+    <form method="GET" action="/admin" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:2;min-width:180px;">
+            <label style="font-size:11px;font-weight:600;color:#6b7a90;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">Search</label>
+            <input type="text" name="search" value="{{ search }}" placeholder="Name, Reg No, or Mobile"
+                   style="width:100%;padding:10px 14px;border:1.5px solid #d0dbe8;border-radius:8px;font-family:DM Sans,sans-serif;font-size:14px;">
+        </div>
+        <div style="flex:1;min-width:130px;">
+            <label style="font-size:11px;font-weight:600;color:#6b7a90;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">Class</label>
+            <select name="class_applied" style="width:100%;padding:10px 14px;border:1.5px solid #d0dbe8;border-radius:8px;font-family:DM Sans,sans-serif;font-size:14px;">
+                <option value="">All Classes</option>
+                {% for c in ['Nursery','LKG','UKG','CL-I','CL-II','CL-III','CL-IV','CL-V','CL-VI','CL-VII','CL-VIII','CL-IX','CL-X','CL-XI','CL-XII'] %}
+                <option value="{{ c }}" {% if filter_class == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="flex:1;min-width:120px;">
+            <label style="font-size:11px;font-weight:600;color:#6b7a90;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">Status</label>
+            <select name="status" style="width:100%;padding:10px 14px;border:1.5px solid #d0dbe8;border-radius:8px;font-family:DM Sans,sans-serif;font-size:14px;">
+                <option value="">All Status</option>
+                <option value="pending"  {% if filter_status == 'pending'  %}selected{% endif %}>Pending</option>
+                <option value="accepted" {% if filter_status == 'accepted' %}selected{% endif %}>Accepted</option>
+                <option value="rejected" {% if filter_status == 'rejected' %}selected{% endif %}>Rejected</option>
+            </select>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button type="submit" style="padding:10px 20px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">🔍 Filter</button>
+            <a href="/admin" style="padding:10px 16px;background:#f0f4f8;color:#6b7a90;border-radius:8px;font-weight:600;text-decoration:none;font-family:DM Sans,sans-serif;display:flex;align-items:center;">✖</a>
+        </div>
+    </form>
+</div>
+
 <div class="card">
     {% if students %}
     <table>
         <thead>
             <tr>
                 <th>#</th>
+                <th>Photo</th>
+                <th>Reg No</th>
                 <th>Name</th>
                 <th>Father</th>
                 <th>Class</th>
@@ -83,6 +118,14 @@ tr:hover td { background: rgba(26,60,110,0.03); }
             {% for s in students %}
             <tr>
                 <td>{{ s.id }}</td>
+                <td>
+                    {% if s.photo %}
+                    <img src="/uploads/{{ s.photo }}" style="width:44px;height:52px;object-fit:cover;border-radius:6px;border:2px solid #d0dbe8;">
+                    {% else %}
+                    <div style="width:44px;height:52px;background:#f0f4f8;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>
+                    {% endif %}
+                </td>
+                <td><span style="font-family:monospace;font-size:12px;background:#f0f4f8;padding:3px 8px;border-radius:6px;">{{ s.reg_no or '-' }}</span></td>
                 <td><strong>{{ s.name }}</strong></td>
                 <td>{{ s.father_name }}</td>
                 <td>{{ s.class_applied }}</td>
@@ -94,7 +137,7 @@ tr:hover td { background: rgba(26,60,110,0.03); }
                     {% if s.status == 'pending' %}
                     <div class="actions">
                         <a href="/approve/{{ s.id }}" class="btn-approve">✔ Accept</a>
-                        <a href="/reject/{{ s.id }}"  class="btn-reject">✖ Reject</a>
+                        <a href="/reject/{{ s.id }}" class="btn-reject" onclick="return confirm('Reject this student?')">✖ Reject</a>
                     </div>
                     {% else %}
                         —

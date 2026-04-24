@@ -6,24 +6,74 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root { --primary: #1a3c6e; --success: #1a9e5c; --bg: #f0f4f8; }
+:root { --primary: #1a3c6e; --success: #1a9e5c; --bg: #f0f4f8; --border: #d0dbe8; }
 body { font-family: 'DM Sans', sans-serif; background: var(--bg); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
-.card { background: white; border-radius: 20px; box-shadow: 0 8px 40px rgba(0,0,0,0.12); padding: 50px 40px; text-align: center; max-width: 480px; width: 100%; }
-.icon { font-size: 64px; margin-bottom: 20px; animation: pop 0.5s ease; }
-@keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
-h2 { font-family: 'Playfair Display', serif; font-size: 1.8rem; color: var(--primary); margin-bottom: 12px; }
-p { color: #6b7a90; line-height: 1.6; margin-bottom: 28px; }
-.btn { display: inline-block; padding: 13px 32px; background: var(--primary); color: white; border-radius: 10px; text-decoration: none; font-weight: 600; margin: 6px; }
-.btn.outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+.card { background: white; border-radius: 20px; box-shadow: 0 8px 40px rgba(0,0,0,0.12); padding: 48px 40px; text-align: center; max-width: 500px; width: 100%; }
+.icon { font-size: 64px; margin-bottom: 16px; animation: pop 0.5s ease; }
+@keyframes pop { from { transform: scale(0); opacity:0; } to { transform: scale(1); opacity:1; } }
+h2 { font-family: 'Playfair Display', serif; font-size: 1.8rem; color: var(--primary); margin-bottom: 10px; }
+.subtitle { color: #6b7a90; font-size: 14px; margin-bottom: 28px; line-height: 1.6; }
+
+/* Registration number box */
+.reg-box { background: linear-gradient(135deg, #1a3c6e, #2a5caa); border-radius: 14px; padding: 24px; margin: 24px 0; }
+.reg-box .label { color: rgba(255,255,255,0.7); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.reg-box .number { color: white; font-size: 2rem; font-weight: 700; letter-spacing: 3px; font-family: 'Playfair Display', serif; }
+.reg-box .hint { color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 8px; }
+
+.info-strip { background: #f0f4f8; border-radius: 10px; padding: 14px 20px; margin-bottom: 24px; text-align: left; }
+.info-strip p { font-size: 13px; color: #6b7a90; margin: 4px 0; }
+.info-strip strong { color: #1e2a3a; }
+
+.sms-note { background: #e8f5e9; border-radius: 10px; padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: #1a9e5c; font-weight: 600; }
+
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.btn { display: inline-block; padding: 13px 28px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; }
+.btn-primary { background: var(--primary); color: white; }
+.btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+.btn:hover { opacity: 0.9; }
+
+/* Print button */
+.btn-print { background: #6b7a90; color: white; }
+@media print {
+    body { background: white; }
+    .btn-row { display: none; }
+    .card { box-shadow: none; border: 1px solid #ccc; }
+}
 </style>
 </head>
 <body>
 <div class="card">
     <div class="icon">🎉</div>
     <h2>Registration Successful!</h2>
-    <p>Your application has been submitted successfully. You will be notified on your registered mobile number about the admission status.</p>
-    <a href="/" class="btn">New Registration</a>
-    <a href="/students" class="btn outline">View All Students</a>
+    <p class="subtitle">
+        {% if student_name %}Dear parent of <strong>{{ student_name }}</strong>, your{% else %}Your{% endif %}
+        application has been submitted successfully.
+    </p>
+
+    {% if reg_no %}
+    <div class="reg-box">
+        <div class="label">📋 Your Registration Number</div>
+        <div class="number">{{ reg_no }}</div>
+        <div class="hint">Save this number to check your application status</div>
+    </div>
+    {% endif %}
+
+    <div class="info-strip">
+        <p>✅ <strong>Application received</strong> and under review</p>
+        <p>📱 <strong>SMS & WhatsApp</strong> confirmation sent to your mobile</p>
+        <p>📧 <strong>Email</strong> confirmation sent to your email address</p>
+        <p>🔔 You will be notified once a decision is made</p>
+    </div>
+
+    <div class="sms-note">
+        📌 Please save your Registration Number: <strong>{{ reg_no }}</strong>
+    </div>
+
+    <div class="btn-row">
+        <button onclick="window.print()" class="btn btn-print">🖨️ Print</button>
+        <a href="/students" class="btn btn-outline">🔍 Check Status</a>
+        <a href="/" class="btn btn-primary">+ New Registration</a>
+    </div>
 </div>
 </body>
 </html>

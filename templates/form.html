@@ -472,6 +472,24 @@
                     <textarea name="address" placeholder="Full residential address"></textarea>
                 </div>
 
+                <div class="form-group">
+                    <label>Student Passport Photo <span class="req">*</span> <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px;">(JPG or PNG, max 2MB)</span></label>
+                    <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+                        <div class="file-upload" style="flex:1;min-width:200px;" onclick="document.getElementById('photo').click()">
+                            <input type="file" id="photo" name="photo" accept="image/jpeg,image/png" onchange="previewPhoto(this)" required>
+                            <label class="file-upload-label">📷 Click to upload photo &nbsp;|&nbsp; <strong>Browse</strong></label>
+                            <div class="file-name" id="photo-fname"></div>
+                        </div>
+                        <div id="photoPreviewWrap" style="display:none;text-align:center;">
+                            <img id="photoPreview" src="" alt="Preview"
+                                 style="width:100px;height:120px;object-fit:cover;border-radius:8px;border:2px solid var(--primary);box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                            <div style="font-size:11px;color:var(--success);margin-top:4px;font-weight:600;">✅ Photo selected</div>
+                        </div>
+                    </div>
+                </div>
+
+
+
                 <div class="form-row">
                     <div class="form-group">
                         <label>Father's Occupation</label>
@@ -894,6 +912,19 @@ function checkForm(event) {
 
 function viewStudents() {
     window.location.href = '/students';
+}
+
+// Photo preview
+function previewPhoto(input) {
+    const file = input.files[0];
+    if (!file) return;
+    document.getElementById('photo-fname').textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('photoPreview').src = e.target.result;
+        document.getElementById('photoPreviewWrap').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
 }
 
 // Init progress
