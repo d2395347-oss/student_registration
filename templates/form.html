@@ -629,6 +629,12 @@
                     <div class="otp-status" id="otpStatus"></div>
                 </div>
 
+                <div class="form-group">
+                    <label>Email Address <span class="req">*</span></label>
+                    <input type="email" name="email" id="email" placeholder="Parent/Guardian email address" required>
+                    <div class="error-msg" id="err-email">Please enter a valid email address</div>
+                </div>
+
                 <div class="section-divider">Identity Documents</div>
 
                 <div class="form-row">
@@ -848,6 +854,11 @@ function checkForm(event) {
     const classApplied = document.getElementById('class_applied').value;
     markField('class_applied', !!classApplied);
     if (!classApplied) valid = false;
+
+    const email = document.getElementById('email').value.trim();
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    markField('email', emailOk);
+    if (!emailOk) valid = false;
 
     const phone = document.getElementById('phone').value.trim();
     const phoneOk = /^\d{10}$/.test(phone);

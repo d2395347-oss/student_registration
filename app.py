@@ -1,4 +1,5 @@
 import os
+import smtplib
 from datetime import date
 import time
 import hashlib
@@ -6,6 +7,8 @@ import random
 import re
 from urllib.parse import urlparse
 from functools import wraps
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from twilio.rest import Client
@@ -22,22 +25,30 @@ app.secret_key = os.getenv("SECRET_KEY", "school_secret_key_2024")
 # ================= STARTUP CHECK =================
 print("=" * 50)
 print("Flask starting...")
-print("DB_URL      :", "SET" if os.getenv("DB_URL") else "MISSING - check .env")
-print("Twilio SID  :", "SET" if os.getenv("TWILIO_ACCOUNT_SID") else "MISSING - check .env")
-print("Twilio TOKEN:", "SET" if os.getenv("TWILIO_AUTH_TOKEN") else "MISSING - check .env")
-print("Twilio NUM  :", os.getenv("TWILIO_NUMBER") or "MISSING - check .env")
+print("DB_URL        :", "SET" if os.getenv("DB_URL") else "MISSING")
+print("Twilio SID    :", "SET" if os.getenv("TWILIO_ACCOUNT_SID") else "MISSING")
+print("Twilio TOKEN  :", "SET" if os.getenv("TWILIO_AUTH_TOKEN") else "MISSING")
+print("Twilio SMS NUM:", os.getenv("TWILIO_NUMBER") or "MISSING")
+print("Twilio WA NUM :", os.getenv("TWILIO_WHATSAPP_NUMBER") or "MISSING")
+print("Gmail User    :", os.getenv("GMAIL_USER") or "MISSING")
+print("Gmail Pass    :", "SET" if os.getenv("GMAIL_PASSWORD") else "MISSING")
+print("School Name   :", os.getenv("SCHOOL_NAME", "Our School"))
 print("=" * 50)
 
-# ================= ADMIN CREDENTIALS =================
-# Change these in your .env file!
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "school@123")
+# ================= CONFIG =================
+ADMIN_USERNAME        = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD        = os.getenv("ADMIN_PASSWORD", "school@123")
+SCHOOL_NAME           = os.getenv("SCHOOL_NAME", "Our School")
+SCHOOL_EMAIL          = os.getenv("SCHOOL_EMAIL", "")
+GMAIL_USER            = os.getenv("GMAIL_USER", "")
+GMAIL_PASSWORD        = os.getenv("GMAIL_PASSWORD", "")
+TWILIO_NUMBER         = os.getenv("TWILIO_NUMBER", "")
+TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "")  # e.g. whatsapp:+14155238886
 
 # ================= FILE UPLOAD =================
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {"pdf"}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
@@ -49,29 +60,26 @@ DB_URL = os.getenv("DB_URL")
 if not DB_URL:
     raise Exception("DB_URL not found in .env file")
 
-url = urlparse(DB_URL)
-
+_url = urlparse(DB_URL)
 db_pool = pooling.MySQLConnectionPool(
     pool_name="student_pool",
     pool_size=5,
-    host=url.hostname,
-    user=url.username,
-    password=url.password,
-    database=url.path.lstrip("/"),
-    port=url.port or 3306
+    host=_url.hostname,
+    user=_url.username,
+    password=_url.password,
+    database=_url.path.lstrip("/"),
+    port=_url.port or 3306
 )
 
 def get_db():
     return db_pool.get_connection()
 
 # ================= TWILIO =================
-ACCOUNT_SID   = os.getenv("TWILIO_ACCOUNT_SID")
-AUTH_TOKEN    = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_NUMBER = os.getenv("TWILIO_NUMBER")
-
+ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+AUTH_TOKEN  = os.getenv("TWILIO_AUTH_TOKEN")
 twilio_client = Client(ACCOUNT_SID, AUTH_TOKEN)
 
-# ================= OTP STORE =================
+# ================= OTP =================
 otp_store    = {}
 otp_verified = set()
 OTP_EXPIRY   = 300
@@ -97,12 +105,10 @@ def valid_mobile(phone):
 def save_file(file):
     if file and file.filename and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-        file.save(path)
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
         return filename
     return None
 
-# ================= ADMIN LOGIN REQUIRED =================
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -111,7 +117,257 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# ================= ROUTES =================
+# ================================================================
+# ================= NOTIFICATION FUNCTIONS =======================
+# ================================================================
+
+# -------- SMS --------
+def send_sms(to_phone, message):
+    """Send plain SMS via Twilio."""
+    if not TWILIO_NUMBER:
+        print("[SMS] SKIPPED - TWILIO_NUMBER not set")
+        return
+    try:
+        msg = twilio_client.messages.create(
+            body=message,
+            from_=TWILIO_NUMBER,
+            to=to_phone
+        )
+        print(f"[SMS] Sent to {to_phone} | SID: {msg.sid}")
+    except Exception as e:
+        print(f"[SMS] ERROR to {to_phone}: {e}")
+
+
+# -------- WHATSAPP --------
+def send_whatsapp(to_phone, message):
+    """Send WhatsApp message via Twilio WhatsApp sandbox."""
+    if not TWILIO_WHATSAPP_NUMBER:
+        print("[WhatsApp] SKIPPED - TWILIO_WHATSAPP_NUMBER not set")
+        return
+    try:
+        # Format: whatsapp:+91XXXXXXXXXX
+        wa_to = f"whatsapp:{to_phone}"
+        msg = twilio_client.messages.create(
+            body=message,
+            from_=TWILIO_WHATSAPP_NUMBER,
+            to=wa_to
+        )
+        print(f"[WhatsApp] Sent to {to_phone} | SID: {msg.sid}")
+    except Exception as e:
+        print(f"[WhatsApp] ERROR to {to_phone}: {e}")
+
+
+# -------- EMAIL --------
+def send_email(to_email, subject, html_body):
+    """Send HTML email via Gmail SMTP."""
+    if not GMAIL_USER or not GMAIL_PASSWORD:
+        print("[Email] SKIPPED - Gmail credentials not set")
+        return
+    if not to_email or "@" not in to_email:
+        print(f"[Email] SKIPPED - invalid email: {to_email}")
+        return
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = f"{SCHOOL_NAME} <{GMAIL_USER}>"
+        msg["To"]      = to_email
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER, GMAIL_PASSWORD)
+            server.sendmail(GMAIL_USER, to_email, msg.as_string())
+        print(f"[Email] Sent to {to_email}")
+    except Exception as e:
+        print(f"[Email] ERROR to {to_email}: {e}")
+
+
+# -------- NOTIFY ALL CHANNELS --------
+def notify_registration(name, phone, email, class_applied):
+    """Notify parent when registration is submitted."""
+
+    sms_msg = (
+        f"Dear Parent,\n"
+        f"Thank you! {name}'s application for {class_applied} at {SCHOOL_NAME} "
+        f"has been received successfully.\n"
+        f"You will be notified once the application is reviewed.\n"
+        f"- {SCHOOL_NAME}"
+    )
+
+    wa_msg = (
+        f"🏫 *{SCHOOL_NAME}*\n\n"
+        f"Dear Parent,\n\n"
+        f"✅ Thank you for registering!\n\n"
+        f"*Student Name:* {name}\n"
+        f"*Class Applied:* {class_applied}\n\n"
+        f"Your application has been received and is under review. "
+        f"We will notify you once a decision is made.\n\n"
+        f"_- School Administration_"
+    )
+
+    email_html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">
+        <div style="background:#1a3c6e;padding:24px;text-align:center;">
+            <h1 style="color:white;margin:0;font-size:22px;">🏫 {SCHOOL_NAME}</h1>
+            <p style="color:#a0bce0;margin:6px 0 0;">Admission Portal</p>
+        </div>
+        <div style="padding:32px;">
+            <h2 style="color:#1a3c6e;">Registration Received ✅</h2>
+            <p style="color:#555;line-height:1.7;">Dear Parent,</p>
+            <p style="color:#555;line-height:1.7;">
+                Thank you for submitting the admission application for <strong>{name}</strong> 
+                for class <strong>{class_applied}</strong>.
+            </p>
+            <div style="background:#f0f4f8;border-radius:8px;padding:16px;margin:20px 0;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr><td style="padding:6px 0;color:#888;font-size:13px;">Student Name</td><td style="padding:6px 0;font-weight:600;">{name}</td></tr>
+                    <tr><td style="padding:6px 0;color:#888;font-size:13px;">Class Applied</td><td style="padding:6px 0;font-weight:600;">{class_applied}</td></tr>
+                    <tr><td style="padding:6px 0;color:#888;font-size:13px;">Status</td><td style="padding:6px 0;"><span style="background:#fff3e0;color:#e67e22;padding:3px 10px;border-radius:20px;font-size:13px;font-weight:600;">PENDING REVIEW</span></td></tr>
+                </table>
+            </div>
+            <p style="color:#555;line-height:1.7;">
+                We will notify you via SMS, WhatsApp, and email once your application is reviewed.
+            </p>
+            <p style="color:#999;font-size:13px;margin-top:24px;">- {SCHOOL_NAME} Administration</p>
+        </div>
+        <div style="background:#f8f9fa;padding:16px;text-align:center;border-top:1px solid #e0e0e0;">
+            <p style="color:#aaa;font-size:12px;margin:0;">This is an automated message. Please do not reply.</p>
+        </div>
+    </div>
+    """
+
+    send_sms(phone, sms_msg)
+    send_whatsapp(phone, wa_msg)
+    send_email(email, f"Registration Received - {SCHOOL_NAME}", email_html)
+
+
+def notify_accepted(name, phone, email, class_applied, fees_date, fees_time):
+    """Notify parent when application is accepted."""
+
+    sms_msg = (
+        f"Dear Parent,\n\n"
+        f"Congratulations! {name}'s admission for {class_applied} at {SCHOOL_NAME} "
+        f"has been ACCEPTED.\n\n"
+        f"Please visit on {fees_date} at {fees_time} for fees submission.\n"
+        f"Bring all original documents.\n"
+        f"- {SCHOOL_NAME}"
+    )
+
+    wa_msg = (
+        f"🏫 *{SCHOOL_NAME}*\n\n"
+        f"Dear Parent,\n\n"
+        f"🎉 *Congratulations!*\n\n"
+        f"*{name}'s* admission application for *{class_applied}* has been *ACCEPTED*!\n\n"
+        f"📅 *Fees Submission Date:* {fees_date}\n"
+        f"🕐 *Reporting Time:* {fees_time}\n\n"
+        f"📋 *Please bring:*\n"
+        f"• All original documents\n"
+        f"• Birth certificate\n"
+        f"• Previous marksheet\n"
+        f"• Passport size photos\n\n"
+        f"We look forward to welcoming {name} to our school!\n\n"
+        f"_- School Administration_"
+    )
+
+    email_html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">
+        <div style="background:#1a9e5c;padding:24px;text-align:center;">
+            <h1 style="color:white;margin:0;font-size:22px;">🎉 Admission Accepted!</h1>
+            <p style="color:#a0e0c0;margin:6px 0 0;">{SCHOOL_NAME}</p>
+        </div>
+        <div style="padding:32px;">
+            <h2 style="color:#1a9e5c;">Congratulations! ✅</h2>
+            <p style="color:#555;line-height:1.7;">Dear Parent,</p>
+            <p style="color:#555;line-height:1.7;">
+                We are pleased to inform you that <strong>{name}'s</strong> admission application 
+                for class <strong>{class_applied}</strong> has been <strong>ACCEPTED</strong>.
+            </p>
+            <div style="background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
+                <p style="margin:0;font-size:13px;color:#555;">Please visit the school for fees submission</p>
+                <p style="margin:8px 0 0;font-size:22px;font-weight:700;color:#1a9e5c;">📅 {fees_date}</p>
+                <p style="margin:4px 0 0;font-size:16px;color:#555;">🕐 {fees_time}</p>
+            </div>
+            <div style="background:#f0f4f8;border-radius:8px;padding:16px;margin:20px 0;">
+                <p style="margin:0 0 10px;font-weight:600;color:#1a3c6e;">📋 Documents to bring:</p>
+                <ul style="margin:0;padding-left:20px;color:#555;line-height:2;">
+                    <li>All original documents</li>
+                    <li>Birth certificate</li>
+                    <li>Previous year marksheet</li>
+                    <li>Category certificate (if applicable)</li>
+                    <li>4 passport size photographs</li>
+                </ul>
+            </div>
+            <p style="color:#555;line-height:1.7;">
+                We look forward to welcoming <strong>{name}</strong> to the {SCHOOL_NAME} family!
+            </p>
+            <p style="color:#999;font-size:13px;margin-top:24px;">- {SCHOOL_NAME} Administration</p>
+        </div>
+        <div style="background:#f8f9fa;padding:16px;text-align:center;border-top:1px solid #e0e0e0;">
+            <p style="color:#aaa;font-size:12px;margin:0;">This is an automated message. Please do not reply.</p>
+        </div>
+    </div>
+    """
+
+    send_sms(phone, sms_msg)
+    send_whatsapp(phone, wa_msg)
+    send_email(email, f"Admission Accepted - {name} | {SCHOOL_NAME}", email_html)
+
+
+def notify_rejected(name, phone, email, class_applied, reason=""):
+    """Notify parent when application is rejected."""
+
+    sms_msg = (
+        f"Dear Parent,\n\n"
+        f"We regret to inform you that {name}'s admission application "
+        f"for {class_applied} at {SCHOOL_NAME} has not been accepted at this time.\n"
+        f"For details, please contact the school office.\n"
+        f"- {SCHOOL_NAME}"
+    )
+
+    wa_msg = (
+        f"🏫 *{SCHOOL_NAME}*\n\n"
+        f"Dear Parent,\n\n"
+        f"We regret to inform you that *{name}'s* admission application "
+        f"for *{class_applied}* has not been accepted at this time.\n\n"
+        f"{'*Reason:* ' + reason + chr(10) + chr(10) if reason else ''}"
+        f"For more information, please contact the school office.\n\n"
+        f"_- School Administration_"
+    )
+
+    email_html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">
+        <div style="background:#d63031;padding:24px;text-align:center;">
+            <h1 style="color:white;margin:0;font-size:22px;">Application Status Update</h1>
+            <p style="color:#ffa0a0;margin:6px 0 0;">{SCHOOL_NAME}</p>
+        </div>
+        <div style="padding:32px;">
+            <h2 style="color:#d63031;">Application Not Accepted</h2>
+            <p style="color:#555;line-height:1.7;">Dear Parent,</p>
+            <p style="color:#555;line-height:1.7;">
+                We regret to inform you that <strong>{name}'s</strong> admission application 
+                for class <strong>{class_applied}</strong> has not been accepted at this time.
+            </p>
+            {'<div style="background:#fdecea;border-radius:8px;padding:16px;margin:16px 0;"><strong>Reason:</strong> ' + reason + '</div>' if reason else ''}
+            <p style="color:#555;line-height:1.7;">
+                For more information or to inquire about future admission cycles, 
+                please contact our school office.
+            </p>
+            <p style="color:#999;font-size:13px;margin-top:24px;">- {SCHOOL_NAME} Administration</p>
+        </div>
+        <div style="background:#f8f9fa;padding:16px;text-align:center;border-top:1px solid #e0e0e0;">
+            <p style="color:#aaa;font-size:12px;margin:0;">This is an automated message. Please do not reply.</p>
+        </div>
+    </div>
+    """
+
+    send_sms(phone, sms_msg)
+    send_whatsapp(phone, wa_msg)
+    send_email(email, f"Application Update - {name} | {SCHOOL_NAME}", email_html)
+
+
+# ================================================================
+# ======================== ROUTES ================================
+# ================================================================
+
 @app.route("/")
 def home():
     return render_template("form.html")
@@ -122,28 +378,25 @@ def send_otp():
     raw_phone = request.form.get("phone", "")
     phone = normalize_phone(raw_phone)
 
-    print(f"\n[OTP] Raw input  : '{raw_phone}'")
-    print(f"[OTP] Normalized : '{phone}'")
-    print(f"[OTP] From number: '{TWILIO_NUMBER}'")
+    print(f"\n[OTP] Raw: '{raw_phone}' → Normalized: '{phone}'")
 
     if not valid_mobile(phone):
-        print(f"[OTP] FAILED - invalid mobile format")
         return jsonify({"status": "error", "message": "Invalid mobile number format"})
 
     otp = str(random.randint(100000, 999999))
     otp_store[phone] = {"otp": otp, "time": time.time()}
-    print(f"[OTP] Generated OTP: {otp} for {phone}")
+    print(f"[OTP] Generated: {otp} for {phone}")
 
     try:
         msg = twilio_client.messages.create(
-            body=f"Your school registration OTP is {otp}. Valid for 5 minutes.",
+            body=f"Your {SCHOOL_NAME} registration OTP is {otp}. Valid for 5 minutes.",
             from_=TWILIO_NUMBER,
             to=phone
         )
-        print(f"[OTP] SUCCESS - Twilio SID: {msg.sid}")
+        print(f"[OTP] SUCCESS - SID: {msg.sid}")
         return jsonify({"status": "success"})
     except Exception as e:
-        print(f"[OTP] TWILIO ERROR: {e}")
+        print(f"[OTP] ERROR: {e}")
         return jsonify({"status": "error", "message": str(e)})
 
 # -------- VERIFY OTP --------
@@ -153,24 +406,17 @@ def verify_otp():
     phone = normalize_phone(raw_phone)
     otp   = request.form.get("otp", "").strip()
 
-    print(f"\n[VERIFY] Phone : {phone}, OTP: {otp}")
-
     data = otp_store.get(phone)
-
     if not data:
         return jsonify({"status": "error", "message": "No OTP found. Please send OTP first."})
-
     if time.time() - data["time"] > OTP_EXPIRY:
         otp_store.pop(phone, None)
         return jsonify({"status": "error", "message": "OTP expired. Please resend."})
-
     if otp == data["otp"]:
         otp_verified.add(phone)
         otp_store.pop(phone, None)
-        print(f"[VERIFY] SUCCESS for {phone}")
         return jsonify({"status": "success"})
     else:
-        print(f"[VERIFY] FAILED - expected {data['otp']}, got {otp}")
         return jsonify({"status": "error", "message": "Incorrect OTP. Please try again."})
 
 # -------- SUBMIT FORM --------
@@ -199,6 +445,7 @@ def submit():
     sports               = request.form.get("sports", "").strip()
     aadhaar              = request.form.get("aadhaar", "").strip()
     pan_no               = request.form.get("pan_no", "").strip().upper()
+    email                = request.form.get("email", "").strip().lower()
 
     errors = []
     if not name:                   errors.append("Name is required")
@@ -208,7 +455,6 @@ def submit():
     if not category:               errors.append("Category is required")
     if not valid_aadhaar(aadhaar): errors.append("Invalid Aadhaar (must be 12 digits)")
     if not valid_pan(pan_no):      errors.append("Invalid PAN format (e.g. ABCDE1234F)")
-
     if errors:
         return "<br>".join(errors), 400
 
@@ -219,33 +465,26 @@ def submit():
 
     conn   = get_db()
     cursor = conn.cursor()
-
     try:
         cursor.execute("""
             INSERT INTO students (
                 name, father_name, date_of_birth, address,
                 father_occupation, academic_year, previous_institution_name,
                 class_applied, category, gender,
-                phone_no, aadhaar_no, pan_no,
+                phone_no, aadhaar_no, pan_no, email,
                 special_child, extra_activity, achievement,
                 hobbies, sports,
                 special_file, extra_file, achievement_file,
                 status
             ) VALUES (
-                %s, %s, %s, %s,
-                %s, %s, %s,
-                %s, %s, %s,
-                %s, %s, %s,
-                %s, %s, %s,
-                %s, %s,
-                %s, %s, %s,
-                %s
+                %s,%s,%s,%s, %s,%s,%s, %s,%s,%s,
+                %s,%s,%s,%s, %s,%s,%s, %s,%s, %s,%s,%s, %s
             )
         """, (
             name, father_name, date_of_birth, address,
             father_occupation, academic_year, previous_institution,
             class_applied, category, gender,
-            phone, aadhaar_hash, pan_no,
+            phone, aadhaar_hash, pan_no, email,
             special_child, extra_activity, achievement,
             hobbies, sports,
             special_file, extra_file, achievement_file,
@@ -253,13 +492,15 @@ def submit():
         ))
         conn.commit()
         otp_verified.discard(phone)
-        print(f"[SUBMIT] SUCCESS - Student '{name}' registered")
+        print(f"[SUBMIT] SUCCESS - {name}")
+
+        # Send registration confirmation notifications
+        notify_registration(name, phone, email, class_applied)
 
     except Exception as e:
         conn.rollback()
         print(f"[SUBMIT] DB ERROR: {e}")
         return f"Registration failed: {e}", 500
-
     finally:
         cursor.close()
         conn.close()
@@ -271,7 +512,7 @@ def submit():
 def success():
     return render_template("success.html")
 
-# -------- PUBLIC: CHECK STATUS BY PHONE --------
+# -------- PUBLIC STATUS CHECK --------
 @app.route("/students")
 def students():
     return render_template("students.html")
@@ -280,51 +521,41 @@ def students():
 def check_status():
     raw_phone = request.form.get("phone", "")
     phone = normalize_phone(raw_phone)
-
     conn   = get_db()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
         SELECT name, father_name, class_applied, category, gender, phone_no, status
-        FROM students WHERE phone_no = %s ORDER BY id DESC LIMIT 1
+        FROM students WHERE phone_no=%s ORDER BY id DESC LIMIT 1
     """, (phone,))
     student = cursor.fetchone()
     cursor.close()
     conn.close()
-
-    if student:
-        return jsonify({"found": True, "student": student})
-    else:
-        return jsonify({"found": False})
+    return jsonify({"found": True, "student": student} if student else {"found": False})
 
 # -------- ADMIN LOGIN --------
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     if request.method == "POST":
-        username = request.form.get("username", "")
-        password = request.form.get("password", "")
-
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        if (request.form.get("username") == ADMIN_USERNAME and
+                request.form.get("password") == ADMIN_PASSWORD):
             session["admin_logged_in"] = True
             return redirect(url_for("admin_panel"))
-        else:
-            return render_template("admin_login.html", error="Invalid username or password")
-
+        return render_template("admin_login.html", error="Invalid username or password")
     return render_template("admin_login.html", error=None)
 
-# -------- ADMIN LOGOUT --------
 @app.route("/admin/logout")
 def admin_logout():
     session.pop("admin_logged_in", None)
     return redirect(url_for("admin_login"))
 
-# -------- ADMIN PANEL (PROTECTED) --------
+# -------- ADMIN PANEL --------
 @app.route("/admin")
 @admin_required
 def admin_panel():
     conn   = get_db()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
-        SELECT id, name, father_name, class_applied, category, gender, phone_no, status
+        SELECT id, name, father_name, class_applied, category, gender, phone_no, email, status
         FROM students ORDER BY id DESC
     """)
     data = cursor.fetchall()
@@ -332,15 +563,14 @@ def admin_panel():
     conn.close()
     return render_template("admin.html", students=data)
 
-# -------- APPROVE (ADMIN ONLY) --------
+# -------- APPROVE --------
 @app.route("/approve/<int:student_id>", methods=["GET", "POST"])
 @admin_required
 def approve(student_id):
-    # GET: show date picker confirmation page
     if request.method == "GET":
         conn   = get_db()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id, name, class_applied, phone_no FROM students WHERE id=%s", (student_id,))
+        cursor.execute("SELECT id, name, class_applied, phone_no, email FROM students WHERE id=%s", (student_id,))
         student = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -348,13 +578,11 @@ def approve(student_id):
             return "Student not found", 404
         return render_template("approve_confirm.html", student=student, today=date.today().isoformat())
 
-    # POST: process approval with fees date
     fees_date = request.form.get("fees_date", "").strip()
     fees_time = request.form.get("fees_time", "9:00 AM").strip()
 
     conn   = get_db()
     cursor = conn.cursor(dictionary=True)
-
     cursor.execute("SELECT * FROM students WHERE id=%s", (student_id,))
     student = cursor.fetchone()
 
@@ -372,79 +600,44 @@ def approve(student_id):
         conn.close()
         return f"Class '{class_name}' not found in system.", 400
 
+    phone = student["phone_no"]
+    name  = student["name"]
+    email = student.get("email", "")
+
     if cls["filled_seats"] < cls["total_seats"]:
         cursor.execute("UPDATE students SET status='accepted' WHERE id=%s", (student_id,))
         cursor.execute("UPDATE classes SET filled_seats=filled_seats+1 WHERE class_name=%s", (class_name,))
         conn.commit()
-
-        # Send acceptance SMS with fees date
-        phone    = student["phone_no"]
-        name     = student["name"]
-        sms_body = (
-            f"Dear Parent,\n\n"
-            f"Congratulations! {name}'s admission application for {class_name} has been ACCEPTED.\n\n"
-            f"Please visit the school on {fees_date} at {fees_time} for fees submission.\n\n"
-            f"Kindly bring all original documents.\n"
-            f"- School Administration"
-        )
-        try:
-            twilio_client.messages.create(body=sms_body, from_=TWILIO_NUMBER, to=phone)
-            print(f"[SMS] Acceptance SMS sent to {phone}")
-        except Exception as e:
-            print(f"[SMS] ERROR: {e}")
-
+        # Send acceptance notifications (SMS + WhatsApp + Email)
+        notify_accepted(name, phone, email, class_name, fees_date, fees_time)
     else:
         cursor.execute("UPDATE students SET status='rejected' WHERE id=%s", (student_id,))
         conn.commit()
-
-        # Notify seats full
-        phone    = student["phone_no"]
-        name     = student["name"]
-        sms_body = (
-            f"Dear Parent,\n\n"
-            f"We regret that {name}'s application for {class_name} "
-            f"could not be accepted as all seats are full.\n\n"
-            f"- School Administration"
-        )
-        try:
-            twilio_client.messages.create(body=sms_body, from_=TWILIO_NUMBER, to=phone)
-            print(f"[SMS] Seats-full rejection SMS sent to {phone}")
-        except Exception as e:
-            print(f"[SMS] ERROR: {e}")
+        # Seats full - notify rejection
+        notify_rejected(name, phone, email, class_name, reason="All seats are filled for this class.")
 
     cursor.close()
     conn.close()
     return redirect(url_for("admin_panel"))
 
-# -------- REJECT (ADMIN ONLY) --------
+# -------- REJECT --------
 @app.route("/reject/<int:student_id>")
 @admin_required
 def reject(student_id):
     conn   = get_db()
     cursor = conn.cursor(dictionary=True)
-
-    cursor.execute("SELECT name, class_applied, phone_no FROM students WHERE id=%s", (student_id,))
+    cursor.execute("SELECT name, class_applied, phone_no, email FROM students WHERE id=%s", (student_id,))
     student = cursor.fetchone()
 
     if student:
         cursor.execute("UPDATE students SET status='rejected' WHERE id=%s", (student_id,))
         conn.commit()
-
-        # Send rejection SMS
-        phone    = student["phone_no"]
-        name     = student["name"]
-        sms_body = (
-            f"Dear Parent,\n\n"
-            f"We regret to inform you that {name}'s admission application "
-            f"has not been accepted at this time.\n\n"
-            f"For more information, please contact the school office.\n"
-            f"- School Administration"
+        notify_rejected(
+            student["name"],
+            student["phone_no"],
+            student.get("email", ""),
+            student["class_applied"]
         )
-        try:
-            twilio_client.messages.create(body=sms_body, from_=TWILIO_NUMBER, to=phone)
-            print(f"[SMS] Rejection SMS sent to {phone}")
-        except Exception as e:
-            print(f"[SMS] ERROR: {e}")
 
     cursor.close()
     conn.close()

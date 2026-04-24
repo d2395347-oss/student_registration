@@ -49,3 +49,6 @@ INSERT IGNORE INTO classes (class_name, total_seats) VALUES
 ('CL-IV',  40), ('CL-V',    40), ('CL-VI',   40),
 ('CL-VII', 40), ('CL-VIII', 40), ('CL-IX',   40),
 ('CL-X',   40), ('CL-XI',   35), ('CL-XII',  35);
+
+-- Add email column if not exists (run this if table already created)
+ALTER TABLE students ADD COLUMN IF NOT EXISTS email VARCHAR(200);
