@@ -411,6 +411,17 @@
 </head>
 <body>
 
+<!-- Deadline Banner -->
+{% if closed %}
+<div style="background:#d63031;color:white;text-align:center;padding:14px;font-weight:600;font-size:15px;position:sticky;top:0;z-index:100;">
+    ⛔ Registration is CLOSED. The deadline was {{ deadline }}. No new applications are accepted.
+</div>
+{% elif deadline %}
+<div style="background:#e8a020;color:white;text-align:center;padding:12px;font-weight:600;font-size:14px;position:sticky;top:0;z-index:100;">
+    ⏰ Last date to apply: <strong>{{ deadline }}</strong> — Register before the deadline!
+</div>
+{% endif %}
+
 <div class="page-header">
     <div class="school-badge">
         <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
@@ -522,14 +533,22 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Class Applied For <span class="req">*</span></label>
-                        <select name="class_applied" id="class_applied" required>
+                        <select name="class_applied" id="class_applied" required onchange="showSeatInfo(this.value)">
                             <option value="">Select Class</option>
+                            {% for s in seat_info %}
+                            <option value="{{ s.class_name }}" {% if s.available <= 0 %}disabled{% endif %}>
+                                {{ s.class_name }} — {% if s.available <= 0 %}FULL{% else %}{{ s.available }} seats available{% endif %}
+                            </option>
+                            {% endfor %}
+                            {% if not seat_info %}
                             <option>Nursery</option><option>LKG</option><option>UKG</option>
                             <option>CL-I</option><option>CL-II</option><option>CL-III</option>
                             <option>CL-IV</option><option>CL-V</option><option>CL-VI</option>
                             <option>CL-VII</option><option>CL-VIII</option><option>CL-IX</option>
                             <option>CL-X</option><option>CL-XI</option><option>CL-XII</option>
+                            {% endif %}
                         </select>
+                        <div id="seatInfoBox" style="display:none;margin-top:8px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;"></div>
                         <div class="error-msg" id="err-class">Please select class</div>
                     </div>
                     <div class="form-group">
@@ -679,7 +698,11 @@
                     <p>I hereby declare that all the information provided in this registration form is true, complete, and correct to the best of my knowledge. I understand that providing false information may lead to cancellation of admission.</p>
                 </div>
 
-                <button type="submit" class="btn-submit">Submit Registration →</button>
+                {% if closed %}
+        <button type="button" class="btn-submit" style="background:#aaa;cursor:not-allowed;" disabled>Registration Closed</button>
+        {% else %}
+        <button type="submit" class="btn-submit">Submit Registration →</button>
+        {% endif %}
             </div>
         </div>
 
@@ -907,6 +930,26 @@ function checkForm(event) {
         event.preventDefault();
         showToast('Please fix the errors above', 'error');
         document.querySelector('.error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+// Seat info display
+const seatData = {{ seat_info | tojson | safe }};
+function showSeatInfo(cls) {
+    const box = document.getElementById('seatInfoBox');
+    if (!cls || !seatData.length) { box.style.display='none'; return; }
+    const info = seatData.find(s => s.class_name === cls);
+    if (!info) { box.style.display='none'; return; }
+    box.style.display = 'block';
+    if (info.available <= 0) {
+        box.style.background = '#fdecea'; box.style.color = '#d63031';
+        box.textContent = `⛔ No seats available for ${cls}. All ${info.total_seats} seats are filled.`;
+    } else if (info.available <= 5) {
+        box.style.background = '#fff3e0'; box.style.color = '#e67e22';
+        box.textContent = `⚠️ Only ${info.available} seats left out of ${info.total_seats} for ${cls}. Apply quickly!`;
+    } else {
+        box.style.background = '#e8f5e9'; box.style.color = '#1a9e5c';
+        box.textContent = `✅ ${info.available} seats available out of ${info.total_seats} for ${cls}.`;
     }
 }
 

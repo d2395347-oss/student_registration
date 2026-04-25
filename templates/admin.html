@@ -7,55 +7,100 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-    --primary: #1a3c6e; --success: #1a9e5c; --danger: #d63031; --pending: #e67e22;
-    --bg: #f0f4f8; --card: #fff; --text: #1e2a3a; --muted: #6b7a90; --border: #d0dbe8;
+    --primary:#1a3c6e; --accent:#e8a020; --success:#1a9e5c;
+    --danger:#d63031; --pending:#e67e22;
+    --bg:#f0f4f8; --card:#fff; --text:#1e2a3a; --muted:#6b7a90; --border:#d0dbe8;
 }
-body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); padding: 30px 16px; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-h1 { font-family: 'Playfair Display', serif; color: var(--primary); font-size: 1.8rem; }
-.btn { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
-.btn-logout { background: var(--danger); }
-.stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-.stat-card { background: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); text-align: center; flex: 1; min-width: 120px; }
-.stat-card .num { font-size: 2rem; font-weight: 700; font-family: 'Playfair Display', serif; color: var(--primary); }
-.stat-card .lbl { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-.card { background: white; border-radius: 14px; box-shadow: 0 2px 16px rgba(0,0,0,0.07); overflow: hidden; }
-table { width: 100%; border-collapse: collapse; }
-thead { background: var(--primary); color: white; }
-th { padding: 14px 16px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-td { padding: 13px 16px; font-size: 14px; border-bottom: 1px solid var(--border); }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: rgba(26,60,110,0.03); }
-.badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: capitalize; }
-.badge.pending  { background: #fff3e0; color: var(--pending); }
-.badge.accepted { background: #e8f5e9; color: var(--success); }
-.badge.rejected { background: #fdecea; color: var(--danger); }
-.actions { display: flex; gap: 6px; }
-.btn-approve, .btn-reject { padding: 6px 14px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none; }
-.btn-approve { background: var(--success); color: white; }
-.btn-reject  { background: var(--danger);  color: white; }
-.empty { text-align: center; padding: 40px; color: var(--muted); }
-.admin-badge { background: #fff3e0; color: var(--pending); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
-@media(max-width:700px) { table { display: block; overflow-x: auto; } }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); padding:20px 16px; }
+.header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+h1 { font-family:'Playfair Display',serif; color:var(--primary); font-size:1.6rem; }
+.btn { padding:9px 18px; border:none; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+.btn-primary { background:var(--primary); color:white; }
+.btn-success { background:var(--success); color:white; }
+.btn-danger  { background:var(--danger);  color:white; }
+.btn-accent  { background:var(--accent);  color:white; }
+.btn-logout  { background:#6b7a90; color:white; }
+.btn:hover { opacity:0.88; }
+
+/* Stats */
+.stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+.stat-card { background:white; padding:14px 20px; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,0.06); text-align:center; flex:1; min-width:110px; }
+.stat-card .num { font-size:1.8rem; font-weight:700; font-family:'Playfair Display',serif; }
+.stat-card .lbl { font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+
+/* Panel cards */
+.panel { background:white; border-radius:14px; box-shadow:0 2px 16px rgba(0,0,0,0.07); padding:20px; margin-bottom:16px; }
+.panel-title { font-size:13px; font-weight:600; color:var(--primary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:14px; border-bottom:2px solid var(--border); padding-bottom:8px; }
+
+/* Seat grid */
+.seat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; }
+.seat-item { border:1.5px solid var(--border); border-radius:10px; padding:10px; text-align:center; }
+.seat-item .cls-name { font-size:13px; font-weight:700; color:var(--primary); }
+.seat-item .seat-nums { font-size:12px; color:var(--muted); margin:4px 0; }
+.seat-bar-wrap { background:#f0f4f8; border-radius:4px; height:6px; overflow:hidden; margin:6px 0; }
+.seat-bar { height:100%; border-radius:4px; transition:width 0.4s; }
+.seat-tag { font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
+.full  { background:#fdecea; color:var(--danger); }
+.avail { background:#e8f5e9; color:var(--success); }
+.low   { background:#fff3e0; color:var(--pending); }
+
+/* Deadline */
+.deadline-form { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+.deadline-form input[type=date] { padding:9px 14px; border:1.5px solid var(--border); border-radius:8px; font-family:'DM Sans',sans-serif; font-size:14px; }
+.deadline-badge { display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; }
+.deadline-active { background:#fff3e0; color:var(--pending); }
+.deadline-none   { background:#e8f5e9; color:var(--success); }
+
+/* Search bar */
+.search-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+.search-bar input, .search-bar select { padding:9px 14px; border:1.5px solid var(--border); border-radius:8px; font-family:'DM Sans',sans-serif; font-size:14px; }
+.search-bar input { flex:2; min-width:160px; }
+.search-bar select { flex:1; min-width:120px; }
+
+/* Table */
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; min-width:700px; }
+thead { background:var(--primary); color:white; }
+th { padding:12px 14px; text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
+td { padding:11px 14px; font-size:14px; border-bottom:1px solid var(--border); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(26,60,110,0.03); }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge.pending  { background:#fff3e0; color:var(--pending); }
+.badge.accepted { background:#e8f5e9; color:var(--success); }
+.badge.rejected { background:#fdecea; color:var(--danger); }
+.actions { display:flex; gap:6px; }
+.btn-sm { padding:5px 12px; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; text-decoration:none; }
+.btn-approve { background:var(--success); color:white; }
+.btn-reject  { background:var(--danger);  color:white; }
+.empty { text-align:center; padding:40px; color:var(--muted); }
+
+/* Seat edit modal */
+.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999; align-items:center; justify-content:center; }
+.modal-bg.show { display:flex; }
+.modal { background:white; border-radius:16px; padding:28px; width:320px; }
+.modal h3 { font-family:'Playfair Display',serif; color:var(--primary); margin-bottom:16px; }
+.modal label { font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; display:block; margin-bottom:5px; }
+.modal input { width:100%; padding:10px 14px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; margin-bottom:14px; }
+.modal-btns { display:flex; gap:8px; }
+@media(max-width:600px) { .stats .stat-card { min-width:80px; } }
 </style>
 </head>
 <body>
 
 <div class="header">
-    <div>
-        <h1>🔐 Admin Panel</h1>
-    </div>
-    <div style="display:flex;gap:10px;align-items:center;">
-        <span class="admin-badge">👤 Admin</span>
+    <h1>🔐 Admin Panel — {{ school_name if school_name else "School" }}</h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <a href="/admin/export_excel{% if filter_class or filter_status %}?class_applied={{ filter_class }}&status={{ filter_status }}{% endif %}" class="btn btn-accent">📥 Export Excel</a>
         <a href="/admin/logout" class="btn btn-logout">Logout</a>
     </div>
 </div>
 
-{% set total    = students | length %}
-{% set accepted = students | selectattr('status','equalto','accepted') | list | length %}
-{% set rejected = students | selectattr('status','equalto','rejected') | list | length %}
-{% set pending  = students | selectattr('status','equalto','pending')  | list | length %}
-
+<!-- STATS -->
+{% set total    = students|length %}
+{% set accepted = students|selectattr('status','equalto','accepted')|list|length %}
+{% set rejected = students|selectattr('status','equalto','rejected')|list|length %}
+{% set pending  = students|selectattr('status','equalto','pending') |list|length %}
 <div class="stats">
     <div class="stat-card"><div class="num">{{ total }}</div><div class="lbl">Total</div></div>
     <div class="stat-card"><div class="num" style="color:var(--pending)">{{ pending }}</div><div class="lbl">Pending</div></div>
@@ -63,55 +108,81 @@ tr:hover td { background: rgba(26,60,110,0.03); }
     <div class="stat-card"><div class="num" style="color:var(--danger)">{{ rejected }}</div><div class="lbl">Rejected</div></div>
 </div>
 
-<!-- Search & Filter Bar -->
-<div style="background:white;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,0.07);padding:20px;margin-bottom:16px;">
-    <form method="GET" action="/admin" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
-        <div style="flex:2;min-width:180px;">
-            <label style="font-size:11px;font-weight:600;color:#6b7a90;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">Search</label>
-            <input type="text" name="search" value="{{ search }}" placeholder="Name, Reg No, or Mobile"
-                   style="width:100%;padding:10px 14px;border:1.5px solid #d0dbe8;border-radius:8px;font-family:DM Sans,sans-serif;font-size:14px;">
+<!-- DEADLINE PANEL -->
+<div class="panel">
+    <div class="panel-title">📅 Application Deadline</div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div>
+            {% if deadline %}
+            <span class="deadline-badge deadline-active">⏰ Deadline: {{ deadline }}</span>
+            {% else %}
+            <span class="deadline-badge deadline-none">✅ No deadline set — Registration Open</span>
+            {% endif %}
         </div>
-        <div style="flex:1;min-width:130px;">
-            <label style="font-size:11px;font-weight:600;color:#6b7a90;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">Class</label>
-            <select name="class_applied" style="width:100%;padding:10px 14px;border:1.5px solid #d0dbe8;border-radius:8px;font-family:DM Sans,sans-serif;font-size:14px;">
-                <option value="">All Classes</option>
-                {% for c in ['Nursery','LKG','UKG','CL-I','CL-II','CL-III','CL-IV','CL-V','CL-VI','CL-VII','CL-VIII','CL-IX','CL-X','CL-XI','CL-XII'] %}
-                <option value="{{ c }}" {% if filter_class == c %}selected{% endif %}>{{ c }}</option>
-                {% endfor %}
-            </select>
+        <form method="POST" action="/admin/set_deadline" class="deadline-form">
+            <div>
+                <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;display:block;margin-bottom:4px;">Set / Change Deadline</label>
+                <input type="date" name="deadline" value="{{ deadline or '' }}">
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+            {% if deadline %}
+            <button type="submit" name="deadline" value="" class="btn btn-danger">Remove</button>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- SEAT AVAILABILITY PANEL -->
+<div class="panel">
+    <div class="panel-title">🪑 Seat Availability — Click a class to edit seats</div>
+    <div class="seat-grid">
+        {% for s in seat_info %}
+        {% set pct = s.pct %}
+        <div class="seat-item" onclick="openSeatEdit('{{ s.class_name }}', {{ s.total_seats }})" style="cursor:pointer;" title="Click to edit seats">
+            <div class="cls-name">{{ s.class_name }}</div>
+            <div class="seat-bar-wrap">
+                <div class="seat-bar" style="width:{{ pct }}%;background:{% if pct >= 100 %}#d63031{% elif pct >= 80 %}#e67e22{% else %}#1a9e5c{% endif %};"></div>
+            </div>
+            <div class="seat-nums">{{ s.filled_seats }}/{{ s.total_seats }}</div>
+            <span class="seat-tag {% if s.available <= 0 %}full{% elif s.available <= 5 %}low{% else %}avail{% endif %}">
+                {% if s.available <= 0 %}FULL{% elif s.available <= 5 %}{{ s.available }} left{% else %}{{ s.available }} avail{% endif %}
+            </span>
         </div>
-        <div style="flex:1;min-width:120px;">
-            <label style="font-size:11px;font-weight:600;color:#6b7a90;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">Status</label>
-            <select name="status" style="width:100%;padding:10px 14px;border:1.5px solid #d0dbe8;border-radius:8px;font-family:DM Sans,sans-serif;font-size:14px;">
-                <option value="">All Status</option>
-                <option value="pending"  {% if filter_status == 'pending'  %}selected{% endif %}>Pending</option>
-                <option value="accepted" {% if filter_status == 'accepted' %}selected{% endif %}>Accepted</option>
-                <option value="rejected" {% if filter_status == 'rejected' %}selected{% endif %}>Rejected</option>
-            </select>
-        </div>
-        <div style="display:flex;gap:8px;">
-            <button type="submit" style="padding:10px 20px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">🔍 Filter</button>
-            <a href="/admin" style="padding:10px 16px;background:#f0f4f8;color:#6b7a90;border-radius:8px;font-weight:600;text-decoration:none;font-family:DM Sans,sans-serif;display:flex;align-items:center;">✖</a>
-        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- SEARCH & FILTER -->
+<div class="panel">
+    <form method="GET" action="/admin" class="search-bar">
+        <input type="text" name="search" value="{{ search }}" placeholder="🔍 Name, Reg No, or Mobile">
+        <select name="class_applied">
+            <option value="">All Classes</option>
+            {% for c in ['Nursery','LKG','UKG','CL-I','CL-II','CL-III','CL-IV','CL-V','CL-VI','CL-VII','CL-VIII','CL-IX','CL-X','CL-XI','CL-XII'] %}
+            <option value="{{ c }}" {% if filter_class==c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+        </select>
+        <select name="status">
+            <option value="">All Status</option>
+            <option value="pending"  {% if filter_status=='pending'  %}selected{% endif %}>Pending</option>
+            <option value="accepted" {% if filter_status=='accepted' %}selected{% endif %}>Accepted</option>
+            <option value="rejected" {% if filter_status=='rejected' %}selected{% endif %}>Rejected</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="/admin" class="btn" style="background:#f0f4f8;color:var(--muted);">✖ Clear</a>
     </form>
 </div>
 
-<div class="card">
+<!-- STUDENTS TABLE -->
+<div class="panel" style="padding:0;overflow:hidden;">
     {% if students %}
+    <div class="table-wrap">
     <table>
         <thead>
             <tr>
-                <th>#</th>
-                <th>Photo</th>
-                <th>Reg No</th>
-                <th>Name</th>
-                <th>Father</th>
-                <th>Class</th>
-                <th>Category</th>
-                <th>Gender</th>
-                <th>Mobile</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>#</th><th>Photo</th><th>Reg No</th><th>Name</th>
+                <th>Father</th><th>Class</th><th>Category</th>
+                <th>Mobile</th><th>Status</th><th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -120,37 +191,68 @@ tr:hover td { background: rgba(26,60,110,0.03); }
                 <td>{{ s.id }}</td>
                 <td>
                     {% if s.photo %}
-                    <img src="/uploads/{{ s.photo }}" style="width:44px;height:52px;object-fit:cover;border-radius:6px;border:2px solid #d0dbe8;">
+                    <img src="/uploads/{{ s.photo }}" style="width:40px;height:48px;object-fit:cover;border-radius:6px;border:2px solid var(--border);">
                     {% else %}
-                    <div style="width:44px;height:52px;background:#f0f4f8;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>
+                    <div style="width:40px;height:48px;background:#f0f4f8;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;">👤</div>
                     {% endif %}
                 </td>
-                <td><span style="font-family:monospace;font-size:12px;background:#f0f4f8;padding:3px 8px;border-radius:6px;">{{ s.reg_no or '-' }}</span></td>
+                <td><span style="font-family:monospace;font-size:12px;background:#f0f4f8;padding:2px 8px;border-radius:6px;">{{ s.reg_no or '-' }}</span></td>
                 <td><strong>{{ s.name }}</strong></td>
                 <td>{{ s.father_name }}</td>
                 <td>{{ s.class_applied }}</td>
                 <td>{{ s.category }}</td>
-                <td>{{ s.gender }}</td>
                 <td>{{ s.phone_no }}</td>
                 <td><span class="badge {{ s.status }}">{{ s.status }}</span></td>
                 <td>
                     {% if s.status == 'pending' %}
                     <div class="actions">
-                        <a href="/approve/{{ s.id }}" class="btn-approve">✔ Accept</a>
-                        <a href="/reject/{{ s.id }}" class="btn-reject" onclick="return confirm('Reject this student?')">✖ Reject</a>
+                        <a href="/approve/{{ s.id }}" class="btn-sm btn-approve">✔ Accept</a>
+                        <a href="/reject/{{ s.id }}"  class="btn-sm btn-reject" onclick="return confirm('Reject this student?')">✖ Reject</a>
                     </div>
-                    {% else %}
-                        —
-                    {% endif %}
+                    {% else %}—{% endif %}
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% else %}
-    <div class="empty">No registrations yet.</div>
+    <div class="empty">No students found.</div>
     {% endif %}
 </div>
 
+<!-- SEAT EDIT MODAL -->
+<div class="modal-bg" id="seatModal">
+    <div class="modal">
+        <h3>✏️ Edit Seats</h3>
+        <form method="POST" action="/admin/update_seats">
+            <input type="hidden" name="class_name" id="modalClassName">
+            <label>Class</label>
+            <input type="text" id="modalClassDisplay" readonly style="background:#f0f4f8;">
+            <label>Total Seats</label>
+            <input type="number" name="total_seats" id="modalTotalSeats" min="1" max="200" required>
+            <div class="modal-btns">
+                <button type="button" onclick="closeModal()" class="btn btn-logout" style="flex:1;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="flex:1;">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openSeatEdit(cls, total) {
+    document.getElementById('modalClassName').value    = cls;
+    document.getElementById('modalClassDisplay').value = cls;
+    document.getElementById('modalTotalSeats').value   = total;
+    document.getElementById('seatModal').classList.add('show');
+}
+function closeModal() {
+    document.getElementById('seatModal').classList.remove('show');
+}
+// Close on bg click
+document.getElementById('seatModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+</script>
 </body>
 </html>
