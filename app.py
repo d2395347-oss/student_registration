@@ -60,12 +60,26 @@ if not DB_URL:
     raise Exception("DB_URL not found in .env")
 
 _url = urlparse(DB_URL)
-db_pool = pooling.MySQLConnectionPool(
+
+_pool_kwargs = dict(
     pool_name="student_pool", pool_size=5,
     host=_url.hostname, user=_url.username,
     password=_url.password, database=_url.path.lstrip("/"),
     port=_url.port or 3306
 )
+
+# Some free hosts (e.g. Aiven) require SSL. If a DB_SSL_CA env var is set
+# (paste the full contents of the provider's ca.pem there), use it.
+# If not set, behaves exactly as before — safe to leave in for Railway too.
+_ssl_ca_content = os.getenv("DB_SSL_CA")
+if _ssl_ca_content:
+    _ca_path = "/tmp/db_ca.pem"
+    with open(_ca_path, "w") as _f:
+        _f.write(_ssl_ca_content)
+    _pool_kwargs["ssl_ca"] = _ca_path
+    _pool_kwargs["ssl_verify_cert"] = True
+
+db_pool = pooling.MySQLConnectionPool(**_pool_kwargs)
 
 def get_db(): return db_pool.get_connection()
 
@@ -73,6 +87,51 @@ def init_db():
     try:
         conn   = get_db()
         cursor = conn.cursor()
+        # Create core tables if this is a brand-new database (e.g. fresh Aiven instance)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS students (
+                id                       INT AUTO_INCREMENT PRIMARY KEY,
+                name                     VARCHAR(100)  NOT NULL,
+                father_name              VARCHAR(100)  NOT NULL,
+                date_of_birth            VARCHAR(20)   NOT NULL,
+                address                  TEXT,
+                father_occupation        VARCHAR(100),
+                academic_year            VARCHAR(20),
+                previous_institution_name VARCHAR(200),
+                class_applied            VARCHAR(20)   NOT NULL,
+                category                 VARCHAR(20)   NOT NULL,
+                gender                   VARCHAR(10),
+                phone_no                 VARCHAR(15)   NOT NULL,
+                aadhaar_no               VARCHAR(64)   NOT NULL,
+                pan_no                   VARCHAR(20)   NOT NULL,
+                special_child            VARCHAR(5)    DEFAULT 'no',
+                extra_activity           VARCHAR(5)    DEFAULT 'no',
+                achievement              VARCHAR(5)    DEFAULT 'no',
+                hobbies                  VARCHAR(200),
+                sports                   VARCHAR(200),
+                special_file             VARCHAR(255),
+                extra_file               VARCHAR(255),
+                achievement_file         VARCHAR(255),
+                status                   VARCHAR(20)   DEFAULT 'pending',
+                created_at               TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS classes (
+                id           INT AUTO_INCREMENT PRIMARY KEY,
+                class_name   VARCHAR(20)  NOT NULL UNIQUE,
+                total_seats  INT          NOT NULL DEFAULT 30,
+                filled_seats INT          NOT NULL DEFAULT 0
+            )
+        """)
+        cursor.execute("""
+            INSERT IGNORE INTO classes (class_name, total_seats) VALUES
+            ('Nursery', 30), ('LKG', 30), ('UKG', 30),
+            ('CL-I', 40), ('CL-II', 40), ('CL-III', 40),
+            ('CL-IV', 40), ('CL-V', 40), ('CL-VI', 40),
+            ('CL-VII', 40), ('CL-VIII', 40), ('CL-IX', 40),
+            ('CL-X', 40), ('CL-XI', 35), ('CL-XII', 35)
+        """)
         for s in [
             "ALTER TABLE students ADD COLUMN reg_no VARCHAR(20)",
             "ALTER TABLE students ADD COLUMN email VARCHAR(150)",
@@ -201,12 +260,51 @@ def send_sms(to, msg):
         print(f"[SMS] Sent to {to}")
     except Exception as e: print(f"[SMS] ERROR: {e}")
 
+# def send_whatsapp(to, msg):
+#     if not TWILIO_WHATSAPP_NUMBER: return
+#     try:
+#         twilio_client.messages.create(body=msg, from_=TWILIO_WHATSAPP_NUMBER, to=f"whatsapp:{to}")
+#         print(f"[WA] Sent to {to}")
+#     except Exception as e: print(f"[WA] ERROR: {e}")
+
+# FIND this in your app.py (around line 170):
+# ✅ REPLACE WITH THIS:
 def send_whatsapp(to, msg):
     if not TWILIO_WHATSAPP_NUMBER: return
     try:
-        twilio_client.messages.create(body=msg, from_=TWILIO_WHATSAPP_NUMBER, to=f"whatsapp:{to}")
+        wa_from = f"whatsapp:{TWILIO_WHATSAPP_NUMBER.replace('whatsapp:', '')}"
+        wa_to   = f"whatsapp:{to}"
+        twilio_client.messages.create(body=msg, from_=wa_from, to=wa_to)
         print(f"[WA] Sent to {to}")
-    except Exception as e: print(f"[WA] ERROR: {e}")
+    except Exception as e:
+        print(f"[WA] ERROR: {e}")
+        
+@app.route("/send_whatsapp_otp", methods=["POST"])
+def send_whatsapp_otp():
+    if is_deadline_passed():
+        return jsonify({"status": "error", "message": "Registration deadline has passed."})
+
+    raw   = request.form.get("phone", "")
+    phone = normalize_phone(raw)   # becomes +91XXXXXXXXXX
+
+    if not valid_mobile(phone):
+        return jsonify({"status": "error", "message": "Invalid mobile number"})
+
+    otp = str(random.randint(100000, 999999))
+    otp_store[f"wa_{phone}"] = {"otp": otp, "time": time.time()}
+    print(f"[WA OTP] {otp} → {phone}")
+
+    try:
+        msg = twilio_client.messages.create(
+            body=f"🏫 {SCHOOL_NAME}\n\nYour WhatsApp OTP is: *{otp}*\nValid for 5 minutes. Do not share.",
+            from_=f"whatsapp:{TWILIO_WHATSAPP_NUMBER.replace('whatsapp:', '')}",  # ✅ safe either way
+            to=f"whatsapp:{phone}"                                                 # ✅ whatsapp:+91XXXXXXXXXX
+        )
+        print(f"[WA OTP] SID: {msg.sid}")
+        return jsonify({"status": "success"})
+    except Exception as e:
+        print(f"[WA OTP] ERROR: {e}")
+        return jsonify({"status": "error", "message": str(e)})
 
 def send_email(to, subject, html):
     if not GMAIL_USER or not GMAIL_PASSWORD or not to or "@" not in to: return
@@ -288,6 +386,119 @@ def verify_otp():
         return jsonify({"status": "error", "message": "OTP expired. Resend."})
     if otp == data["otp"]:
         otp_verified.add(phone); otp_store.pop(phone, None)
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Incorrect OTP."})
+
+
+# -------- SEND WHATSAPP OTP --------
+@app.route("/send_whatsapp_otp", methods=["POST"])
+def send_whatsapp_otp():
+    if is_deadline_passed():
+        return jsonify({"status": "error", "message": "Registration deadline has passed."})
+    
+    raw   = request.form.get("phone", "")
+    phone = normalize_phone(raw)
+    
+    if not valid_mobile(phone):
+        return jsonify({"status": "error", "message": "Invalid mobile number"})
+    
+    otp = str(random.randint(100000, 999999))
+    otp_store[f"wa_{phone}"] = {"otp": otp, "time": time.time()}
+    print(f"[WA OTP] {otp} → {phone}")
+    
+    try:
+        twilio_client.messages.create(
+            body=f"🏫 {SCHOOL_NAME}\n\nYour WhatsApp OTP is: *{otp}*\nValid for 5 minutes. Do not share.",
+            from_=TWILIO_WHATSAPP_NUMBER,
+            to=f"whatsapp:{phone}"
+        )
+        return jsonify({"status": "success"})
+    except Exception as e:
+        print(f"[WA OTP] ERROR: {e}")
+        return jsonify({"status": "error", "message": str(e)})
+
+# -------- VERIFY WHATSAPP OTP --------
+@app.route("/verify_whatsapp_otp", methods=["POST"])
+def verify_whatsapp_otp():
+    phone = normalize_phone(request.form.get("phone", ""))
+    otp   = request.form.get("otp", "").strip()
+    key   = f"wa_{phone}"
+    data  = otp_store.get(key)
+    
+    if not data:
+        return jsonify({"status": "error", "message": "No OTP sent. Please request first."})
+    if time.time() - data["time"] > OTP_EXPIRY:
+        otp_store.pop(key, None)
+        return jsonify({"status": "error", "message": "OTP expired. Resend."})
+    if otp == data["otp"]:
+        otp_verified.add(f"wa_{phone}")
+        otp_store.pop(key, None)
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Incorrect OTP."})
+
+
+
+# -------- SEND EMAIL OTP --------
+@app.route("/send_email_otp", methods=["POST"])
+def send_email_otp():
+    email = request.form.get("email", "").strip().lower()
+    
+    if not email or "@" not in email:
+        return jsonify({"status": "error", "message": "Invalid email address"})
+    if not GMAIL_USER or not GMAIL_PASSWORD:
+        return jsonify({"status": "error", "message": "Email service not configured"})
+    
+    otp = str(random.randint(100000, 999999))
+    otp_store[f"email_{email}"] = {"otp": otp, "time": time.time()}
+    print(f"[EMAIL OTP] {otp} → {email}")
+    
+    html = f"""
+    <div style="font-family:Arial;max-width:500px;margin:auto;border:1px solid #ddd;border-radius:10px;overflow:hidden;">
+        <div style="background:#1a3c6e;padding:20px;text-align:center;">
+            <h2 style="color:white;margin:0;">🏫 {SCHOOL_NAME}</h2>
+        </div>
+        <div style="padding:30px;text-align:center;">
+            <h3 style="color:#333;">Email Verification OTP</h3>
+            <div style="background:#f0f4f8;border-radius:8px;padding:20px;margin:20px 0;">
+                <p style="color:#888;margin:0 0 8px;">Your OTP Code</p>
+                <h1 style="letter-spacing:12px;color:#1a3c6e;margin:0;">{otp}</h1>
+            </div>
+            <p style="color:#666;font-size:13px;">Valid for <b>5 minutes</b>. Do not share this OTP.</p>
+        </div>
+    </div>
+    """
+    
+    try:
+        m = MIMEMultipart("alternative")
+        m["Subject"] = f"{SCHOOL_NAME} - Email Verification OTP"
+        m["From"]    = f"{SCHOOL_NAME} <{GMAIL_USER}>"
+        m["To"]      = email
+        m.attach(MIMEText(html, "html"))
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
+            s.login(GMAIL_USER, GMAIL_PASSWORD)
+            s.sendmail(GMAIL_USER, email, m.as_string())
+        print(f"[EMAIL OTP] Sent to {email}")
+        return jsonify({"status": "success"})
+    except Exception as e:
+        print(f"[EMAIL OTP] ERROR: {e}")
+        return jsonify({"status": "error", "message": str(e)})
+
+# -------- VERIFY EMAIL OTP --------
+@app.route("/verify_email_otp", methods=["POST"])
+def verify_email_otp():
+    email = request.form.get("email", "").strip().lower()
+    otp   = request.form.get("otp", "").strip()
+    key   = f"email_{email}"
+    data  = otp_store.get(key)
+    
+    if not data:
+        return jsonify({"status": "error", "message": "No OTP sent. Please request first."})
+    if time.time() - data["time"] > OTP_EXPIRY:
+        otp_store.pop(key, None)
+        return jsonify({"status": "error", "message": "OTP expired. Resend."})
+    if otp == data["otp"]:
+        otp_verified.add(f"email_{email}")
+        otp_store.pop(key, None)
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Incorrect OTP."})
 
